@@ -13,6 +13,45 @@
 		android:layout_height="64dp"
 		android:background="@drawable/logo_background"/>
 
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="16dp"
+		android:layout_marginVertical="8dp"
+		android:orientation="horizontal">
+
+		<Button
+			android:id="@+id/btn_memory_stress"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginEnd="8dp"
+			android:layout_weight="1"
+			android:backgroundTint="@color/high"
+			android:text="Memory Load"
+			android:textSize="14sp"/>
+
+		<Button
+			android:id="@+id/btn_cpu_stress"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:backgroundTint="@color/low"
+			android:text="CPU Load"
+			android:textSize="14sp"/>
+
+	</LinearLayout>
+
+	<Button
+		android:id="@+id/btn_new_flows"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="16dp"
+		android:layout_marginVertical="8dp"
+		android:backgroundTint="@color/excellent"
+		android:text="Test New Flows (Raw Data + Weighted Levels)"
+		android:textSize="14sp"/>
+
 	<ScrollView
 		android:id="@+id/scroll_view"
 		android:layout_width="match_parent"
@@ -41,6 +80,21 @@
 				app:layout_constraintStart_toStartOf="parent"
 				app:layout_constraintTop_toTopOf="parent"/>
 
+			<!-- Timestamp Display -->
+			<TextView
+				android:id="@+id/tv_timestamp"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_marginStart="12dp"
+				android:layout_marginTop="8dp"
+				android:text="Last updated: --"
+				android:textColor="@color/black"
+				android:textSize="12sp"
+				android:fontFamily="monospace"
+				app:layout_constraintEnd_toEndOf="parent"
+				app:layout_constraintStart_toStartOf="parent"
+				app:layout_constraintTop_toBottomOf="@id/heading_individual"/>
+
 			<LinearLayout
 				android:id="@+id/individual_first"
 				android:layout_width="match_parent"
@@ -48,23 +102,23 @@
 				android:layout_marginTop="8dp"
 				android:orientation="horizontal"
 				android:paddingHorizontal="6dp"
-				app:layout_constraintTop_toBottomOf="@id/heading_individual">
+				app:layout_constraintTop_toBottomOf="@id/tv_timestamp">
 
-				<com.blinkit.droiddexexample.views.ItemView
+				<com.blinkit.droiddexexample.views.DetailedItemView
 					android:id="@+id/cpu"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
 					android:layout_marginHorizontal="6dp"
 					android:layout_weight="1"/>
 
-				<com.blinkit.droiddexexample.views.ItemView
+				<com.blinkit.droiddexexample.views.DetailedItemView
 					android:id="@+id/memory"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
 					android:layout_marginHorizontal="6dp"
 					android:layout_weight="1"/>
 
-				<com.blinkit.droiddexexample.views.ItemView
+				<com.blinkit.droiddexexample.views.DetailedItemView
 					android:id="@+id/network"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
@@ -82,61 +136,15 @@
 				android:paddingHorizontal="6dp"
 				app:layout_constraintTop_toBottomOf="@id/individual_first">
 
-				<com.blinkit.droiddexexample.views.ItemView
+				<com.blinkit.droiddexexample.views.DetailedItemView
 					android:id="@+id/storage"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
 					android:layout_marginHorizontal="6dp"
 					android:layout_weight="1"/>
 
-				<com.blinkit.droiddexexample.views.ItemView
+				<com.blinkit.droiddexexample.views.DetailedItemView
 					android:id="@+id/battery"
-					android:layout_width="0dp"
-					android:layout_height="wrap_content"
-					android:layout_marginHorizontal="6dp"
-					android:layout_weight="1"/>
-
-			</LinearLayout>
-
-			<TextView
-				android:id="@+id/heading_aggregate"
-				android:layout_width="0dp"
-				android:layout_height="wrap_content"
-				android:layout_gravity="start"
-				android:layout_marginStart="12dp"
-				android:layout_marginTop="24dp"
-				android:text="@string/aggregate"
-				android:textColor="@color/black"
-				android:textSize="20sp"
-				app:layout_constraintEnd_toEndOf="parent"
-				app:layout_constraintStart_toStartOf="parent"
-				app:layout_constraintTop_toBottomOf="@id/individual_second"/>
-
-			<LinearLayout
-				android:id="@+id/aggregate"
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:layout_marginTop="8dp"
-				android:orientation="horizontal"
-				android:paddingHorizontal="6dp"
-				app:layout_constraintTop_toBottomOf="@id/heading_aggregate">
-
-				<com.blinkit.droiddexexample.views.ItemView
-					android:id="@+id/cpu_and_memory"
-					android:layout_width="0dp"
-					android:layout_height="wrap_content"
-					android:layout_marginHorizontal="6dp"
-					android:layout_weight="1"/>
-
-				<com.blinkit.droiddexexample.views.ItemView
-					android:id="@+id/network_and_storage"
-					android:layout_width="0dp"
-					android:layout_height="wrap_content"
-					android:layout_marginHorizontal="6dp"
-					android:layout_weight="1"/>
-
-				<com.blinkit.droiddexexample.views.ItemView
-					android:id="@+id/cpu_memory_and_network"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
 					android:layout_marginHorizontal="6dp"
@@ -156,7 +164,7 @@
 				android:textSize="20sp"
 				app:layout_constraintEnd_toEndOf="parent"
 				app:layout_constraintStart_toStartOf="parent"
-				app:layout_constraintTop_toBottomOf="@id/aggregate"/>
+				app:layout_constraintTop_toBottomOf="@id/individual_second"/>
 
 			<LinearLayout
 				android:id="@+id/weighted_aggregate"
@@ -181,7 +189,15 @@
 					android:layout_marginHorizontal="6dp"
 					android:layout_weight="1"/>
 
+				<com.blinkit.droiddexexample.views.ItemView
+					android:id="@+id/combo_weighted"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginHorizontal="6dp"
+					android:layout_weight="1"/>
+
 			</LinearLayout>
+
 		</androidx.constraintlayout.widget.ConstraintLayout>
 
 	</ScrollView>

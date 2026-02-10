@@ -1,0 +1,52 @@
+package com.blinkit.droiddexexample.utils
+
+import com.blinkit.droiddex.models.*
+import com.blinkit.droiddex.battery.models.BatteryDetailedMetrics
+import com.blinkit.droiddex.cpu.models.CpuDetailedMetrics
+import com.blinkit.droiddex.memory.models.MemoryDetailedMetrics
+import com.blinkit.droiddex.network.models.NetworkDetailedMetrics
+import com.blinkit.droiddex.storage.models.StorageDetailedMetrics
+import com.blinkit.droiddexexample.models.*
+
+fun DetailedMetrics.toExampleMetrics(): PerformanceMetrics = when (this) {
+    is CpuDetailedMetrics -> CpuMetrics(
+        performanceLevel = performanceLevel,
+        coreCount = coreCount,
+        maxCpuFrequency = maxCpuFrequency,
+        totalRamGB = totalRamGB,
+        androidVersion = androidVersion,
+        mediaPerformanceClass = mediaPerformanceClass,
+        heapLimitMB = heapLimitMB
+    )
+    is MemoryDetailedMetrics -> MemoryMetrics(
+        performanceLevel = performanceLevel,
+        availableRamGB = availableRamGB,
+        heapLimitMB = heapLimitMB,
+        heapUsedMB = heapUsedMB,
+        heapRemainingMB = heapRemainingMB,
+        isLowMemory = isLowMemory
+    )
+    is NetworkDetailedMetrics -> NetworkMetrics(
+        performanceLevel = performanceLevel,
+        bandwidthAverage = bandwidthAverage,
+        downloadSpeed = downloadSpeed,
+        networkType = networkType,
+        signalLevel = signalLevel,
+        signalStrength = signalStrength,
+        isConnected = isConnected
+    )
+    is StorageDetailedMetrics -> StorageMetrics(
+        performanceLevel = performanceLevel,
+        totalStorageGB = totalStorageGB,
+        availableStorageGB = availableStorageGB
+    )
+    is BatteryDetailedMetrics -> BatteryMetrics(
+        performanceLevel = performanceLevel,
+        batteryPercentage = batteryPercentage,
+        isCharging = isCharging,
+        batteryStatus = batteryStatus,
+        temperature = temperature,
+        voltage = voltage
+    )
+    else -> throw IllegalArgumentException("Unsupported DetailedMetrics type: ${this::class}")
+}

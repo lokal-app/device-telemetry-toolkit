@@ -12,19 +12,24 @@ import android.telephony.CellInfoWcdma
 import android.telephony.TelephonyManager
 import androidx.annotation.IntRange
 import com.blinkit.droiddex.constants.PerformanceClass
-import com.blinkit.droiddex.constants.PerformanceLevel
+import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.factory.base.PerformanceManager
 import com.blinkit.droiddex.factory.providers.PerformanceManagerProvider
+import com.blinkit.droiddex.models.DetailedMetrics
+import com.blinkit.droiddex.network.models.NetworkDetailedMetrics
+import com.blinkit.droiddex.network.models.NetworkRawPerformanceMetrics
+import com.blinkit.droiddex.network.models.NetworkThresholds
 import com.blinkit.droiddex.network.utils.BandwidthManager
 import com.blinkit.droiddex.utils.getPerformanceLevelWithWeights
 
-internal class NetworkPerformanceManager(private val applicationContext: Context): PerformanceManager() {
+internal class NetworkPerformanceManager(
+    private val applicationContext: Context,
+    private val thresholds: NetworkThresholds = NetworkThresholds()
+): PerformanceManager() {
 
 	private val bandwidthManager by lazy { BandwidthManager(logger) }
 
 	override fun getPerformanceClass() = PerformanceClass.NETWORK
-
-	override fun getDelayInSecs() = DELAY_IN_SECS
 
 	override fun measurePerformanceLevel(): PerformanceLevel {
 		val bandwidthAverage = bandwidthManager.addSampleAndRecalculateBandwidthAverage()
@@ -55,9 +60,9 @@ internal class NetworkPerformanceManager(private val applicationContext: Context
 
 	private fun getBandwidthAverageStrengthLevel(bandwidthAverage: Double) = when {
 		bandwidthAverage <= 0 -> null
-		bandwidthAverage < AVERAGE_BANDWIDTH_THRESHOLD -> PerformanceLevel.LOW
-		bandwidthAverage < HIGH_BANDWIDTH_THRESHOLD -> PerformanceLevel.AVERAGE
-		bandwidthAverage < EXCELLENT_BANDWIDTH_THRESHOLD -> PerformanceLevel.HIGH
+		bandwidthAverage < thresholds.low.bandwidthAverageThreshold -> PerformanceLevel.LOW
+		bandwidthAverage < thresholds.average.bandwidthAverageThreshold -> PerformanceLevel.AVERAGE
+		bandwidthAverage < thresholds.high.bandwidthAverageThreshold -> PerformanceLevel.HIGH
 		else -> PerformanceLevel.EXCELLENT
 	}?.also { logDebug("BANDWIDTH AVERAGE STRENGTH TYPE: ${it.name}") }
 
@@ -72,9 +77,9 @@ internal class NetworkPerformanceManager(private val applicationContext: Context
 		val downloadSpeed = getDownloadSpeed()
 
 		val downloadSpeedStrengthLevel = when {
-			downloadSpeed >= EXCELLENT_DOWNLOAD_SPEED_THRESHOLD -> PerformanceLevel.EXCELLENT
-			downloadSpeed >= HIGH_DOWNLOAD_SPEED_THRESHOLD -> PerformanceLevel.HIGH
-			downloadSpeed >= AVERAGE_DOWNLOAD_SPEED_THRESHOLD -> PerformanceLevel.AVERAGE
+			downloadSpeed >= thresholds.excellent.downloadSpeedThreshold -> PerformanceLevel.EXCELLENT
+			downloadSpeed >= thresholds.high.downloadSpeedThreshold -> PerformanceLevel.HIGH
+			downloadSpeed >= thresholds.average.downloadSpeedThreshold -> PerformanceLevel.AVERAGE
 			else -> PerformanceLevel.LOW
 		}
 
@@ -148,9 +153,9 @@ internal class NetworkPerformanceManager(private val applicationContext: Context
 	}
 
 	private fun categorizeSignalThreshold(signal: Int): PerformanceLevel = when {
-		signal >= EXCELLENT_SIGNAL_THRESHOLD -> PerformanceLevel.EXCELLENT
-		signal >= HIGH_SIGNAL_THRESHOLD -> PerformanceLevel.HIGH
-		signal >= AVERAGE_SIGNAL_THRESHOLD -> PerformanceLevel.AVERAGE
+		signal >= thresholds.excellent.signalStrengthThreshold -> PerformanceLevel.EXCELLENT
+		signal >= thresholds.high.signalStrengthThreshold -> PerformanceLevel.HIGH
+		signal >= thresholds.average.signalStrengthThreshold -> PerformanceLevel.AVERAGE
 		else -> PerformanceLevel.LOW
 	}
 
@@ -170,23 +175,53 @@ internal class NetworkPerformanceManager(private val applicationContext: Context
 
 	private enum class NetworkGeneration { UNKNOWN, NETWORK_2G, NETWORK_3G, NETWORK_4G, NETWORK_5G }
 
-	companion object: PerformanceManagerProvider {
+	override fun measureDetailedMetrics(): DetailedMetrics {
+		val bandwidthAverage = bandwidthManager.addSampleAndRecalculateBandwidthAverage()
+		val isConnected = isInternetConnected()
+		val downloadSpeed = getDownloadSpeed()
+		val networkType = getNetworkType()
+		val signalLevel = when (networkType) {
+			NetworkType.WIFI -> getWifiSignalLevel()
+			NetworkType.CELLULAR -> getCellularInternetStrength()
+			else -> 0
+		}
+		val signalStrength = signalLevel
 
+		return NetworkDetailedMetrics(
+			performanceLevel = measurePerformanceLevel(),
+			bandwidthAverage = bandwidthAverage,
+			downloadSpeed = downloadSpeed,
+			networkType = networkType.name,
+			signalLevel = signalLevel,
+			signalStrength = signalStrength,
+			isConnected = isConnected
+		)
+	}
+
+	 override fun extractRawPerformanceMetrics(): NetworkRawPerformanceMetrics {
+		val bandwidthAverage = bandwidthManager.addSampleAndRecalculateBandwidthAverage()
+		val isConnected = isInternetConnected()
+		val downloadSpeed = getDownloadSpeed()
+		val networkType = getNetworkType()
+		val signalLevel = when (networkType) {
+			NetworkType.WIFI -> getWifiSignalLevel()
+			NetworkType.CELLULAR -> getCellularInternetStrength()
+			else -> 0
+		}
+		val signalStrength = signalLevel
+
+		return NetworkRawPerformanceMetrics(
+			bandwidthAverage = bandwidthAverage,
+			downloadSpeed = downloadSpeed,
+			networkType = networkType.name,
+			signalLevel = signalLevel,
+			signalStrength = signalStrength,
+			isConnected = isConnected
+		)
+	}
+
+	companion object: PerformanceManagerProvider {
 		override fun create(applicationContext: Context): PerformanceManager =
 			NetworkPerformanceManager(applicationContext)
-
-		private const val DELAY_IN_SECS = 2.5F
-
-		private const val EXCELLENT_BANDWIDTH_THRESHOLD = 2000F // 2 Mbps
-		private const val HIGH_BANDWIDTH_THRESHOLD = 550F // 0.55 Mbps
-		private const val AVERAGE_BANDWIDTH_THRESHOLD = 150F // 0.15 Mbps
-
-		private const val EXCELLENT_DOWNLOAD_SPEED_THRESHOLD = 10000 // 10 Mbps
-		private const val HIGH_DOWNLOAD_SPEED_THRESHOLD = 5000 // 5 Mbps
-		private const val AVERAGE_DOWNLOAD_SPEED_THRESHOLD = 2000 // 2 Mbps
-
-		private const val EXCELLENT_SIGNAL_THRESHOLD = 4
-		private const val HIGH_SIGNAL_THRESHOLD = 3
-		private const val AVERAGE_SIGNAL_THRESHOLD = 2
 	}
 }

@@ -1,4 +1,4 @@
-package com.blinkit.droiddex.constants
+package com.blinkit.droiddex.models
 
 import androidx.annotation.Keep
 
