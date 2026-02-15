@@ -28,11 +28,14 @@ import com.blinkit.droiddex.utils.Logger
 import androidx.lifecycle.MutableLiveData
 import com.blinkit.droiddex.utils.getPerformanceLevelWithWeights
 import com.blinkit.droiddex.utils.runAsyncPeriodically
+import android.annotation.SuppressLint
 import android.os.Build
+import android.provider.Settings
 import kotlinx.coroutines.Job
 import kotlin.concurrent.Volatile
 import java.util.concurrent.ConcurrentHashMap
 
+@SuppressLint("HardwareIds")
 internal class PerformanceManagerFactory(
     private val applicationContext: Context,
     private val thresholds: PerformanceThresholds? = null
@@ -40,6 +43,7 @@ internal class PerformanceManagerFactory(
 
 	private val performanceManagerMap = ConcurrentHashMap<Int, PerformanceManager>()
 	private val logger = Logger()
+	private val deviceId: String = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID) ?: ""
 
 	// Atomic collection config — replaces separate volatile fields for thread safety
 	private data class CollectionConfig(val classes: Set<Int>, val delaySeconds: Int)
@@ -135,6 +139,7 @@ internal class PerformanceManagerFactory(
 		return RawPerformanceDataResult(
 			timestamp = executionEndTime,
 			deviceName = Build.MODEL,
+			deviceId = deviceId,
 			cpu = cpuData,
 			memory = memoryData,
 			network = networkData,

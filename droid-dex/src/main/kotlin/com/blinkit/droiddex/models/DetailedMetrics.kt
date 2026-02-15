@@ -16,6 +16,7 @@ public abstract class DetailedMetrics {
 public data class RawPerformanceDataResult(
     val timestamp: Long,
     val deviceName: String,
+    val deviceId: String,
     val cpu: CpuRawPerformanceMetrics?,
     val memory: MemoryRawPerformanceMetrics?,
     val network: NetworkRawPerformanceMetrics?,
@@ -28,6 +29,7 @@ public data class RawPerformanceDataResult(
     public fun toMap(): Map<String, Any?> = mapOf(
         "timestamp" to timestamp,
         "deviceName" to deviceName,
+        "deviceId" to deviceId,
         "cpu" to cpu?.toMap(),
         "memory" to memory?.toMap(),
         "network" to network?.toMap(),
