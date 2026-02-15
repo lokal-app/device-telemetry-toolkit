@@ -14,23 +14,38 @@ import com.blinkit.droiddex.models.WeightedPerformanceLevels
 import com.blinkit.droiddex.utils.Logger
 import com.blinkit.droiddex.utils.getPerformanceLevelLdWithWeights
 import com.blinkit.droiddex.utils.getPerformanceLevelWithWeights
+import kotlin.concurrent.Volatile
 
 public object DroidDex {
 
-	private lateinit var performanceManagerFactory: PerformanceManagerFactory
+	@Volatile
+	private var performanceManagerFactory: PerformanceManagerFactory? = null
 
 	private val logger: Logger by lazy { Logger() }
 
 	public fun init(applicationContext: Context, thresholds: PerformanceThresholds? = null) {
-		if (::performanceManagerFactory.isInitialized) {
-			logger.logError(IllegalStateException("Droid Dex is already initialized"))
-			return
-		}
+		synchronized(this) {
+			if (performanceManagerFactory != null) {
+				logger.logError(IllegalStateException("Droid Dex is already initialized"))
+				return
+			}
 
-		try {
-			performanceManagerFactory = PerformanceManagerFactory(applicationContext, thresholds)
-		} catch (e: Exception) {
-			logger.logError(e)
+			try {
+				performanceManagerFactory = PerformanceManagerFactory(applicationContext, thresholds)
+			} catch (e: Exception) {
+				logger.logError(e)
+			}
+		}
+	}
+
+	/**
+	 * Shuts down DroidDex, cancelling all monitoring coroutines and releasing resources.
+	 * After calling this, init() must be called again before using any other API.
+	 */
+	public fun shutdown() {
+		synchronized(this) {
+			performanceManagerFactory?.shutdown()
+			performanceManagerFactory = null
 		}
 	}
 
@@ -70,10 +85,17 @@ public object DroidDex {
 	 * - Ignore the ones for which the PerformanceLevel is UNKNOWN
 	 * - Take weighted average of all these PerformanceClass
 	 */
-	public fun getWeightedPerformanceLevel(vararg classes: Pair<@PerformanceClass Int, Float>): PerformanceLevel =
-		checkInitialized(*classes.map { it.first }.toIntArray()) ?: getPerformanceLevelWithWeights(classes.map {
-			Pair(performanceManagerFactory.getPerformanceLevel(it.first), it.second)
+	public fun getWeightedPerformanceLevel(vararg classes: Pair<@PerformanceClass Int, Float>): PerformanceLevel {
+		val factory = performanceManagerFactory
+		if (factory == null) {
+			val classesNames = classes.joinToString(", ") { it.first.name() }
+			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
+			return PerformanceLevel.UNKNOWN
+		}
+		return getPerformanceLevelWithWeights(classes.map {
+			Pair(factory.getPerformanceLevel(it.first), it.second)
 		}).also { logger.logPerformanceLevelResult(*classes, performanceLevel = it) }
+	}
 
 	/**
 	 * @param classes spread list of performance classes mapped with weight
@@ -85,29 +107,36 @@ public object DroidDex {
 	 * - Ignore the ones for which the PerformanceLevel is UNKNOWN
 	 * - Take weighted average of all these PerformanceClass
 	 */
-	public fun getWeightedPerformanceLevelLd(vararg classes: Pair<@PerformanceClass Int, Float>): LiveData<PerformanceLevel> =
-		checkInitialized(*classes.map { it.first }.toIntArray())?.let { MutableLiveData(it) }
-			?: getPerformanceLevelLdWithWeights(classes.map {
-				Pair(performanceManagerFactory.getPerformanceLevelLd(it.first), it.second)
-			}) { logger.logPerformanceLevelResult(*classes, performanceLevel = it) }
+	public fun getWeightedPerformanceLevelLd(vararg classes: Pair<@PerformanceClass Int, Float>): LiveData<PerformanceLevel> {
+		val factory = performanceManagerFactory
+		if (factory == null) {
+			val classesNames = classes.joinToString(", ") { it.first.name() }
+			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
+			return MutableLiveData(PerformanceLevel.UNKNOWN)
+		}
+		return getPerformanceLevelLdWithWeights(classes.map {
+			Pair(factory.getPerformanceLevelLd(it.first), it.second)
+		}) { logger.logPerformanceLevelResult(*classes, performanceLevel = it) }
+	}
 
 	/**
 	 * @param performanceClass the performance class to get detailed metrics for
-	 * @return LiveData of DetailedMetrics for the specified performance class
+	 * @return LiveData of DetailedMetrics for the specified performance class, or empty LiveData if not initialized
 	 */
-	public fun getDetailedMetricsLd(@PerformanceClass performanceClass: Int): LiveData<DetailedMetrics>? =
-		if (::performanceManagerFactory.isInitialized) {
-			performanceManagerFactory.getDetailedMetricsLd(performanceClass)
-		} else {
+	public fun getDetailedMetricsLd(@PerformanceClass performanceClass: Int): LiveData<DetailedMetrics> {
+		val factory = performanceManagerFactory
+		if (factory == null) {
 			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameter: ${performanceClass.name()}"))
-			null
+			return MutableLiveData()
 		}
+		return factory.getDetailedMetricsLd(performanceClass)
+	}
 
 	/**
 	 * Starts continuous collection of raw performance data for specified performance classes
 	 * @param classes spread list of performance classes to monitor
-	 * @param delay interval in seconds between data collection cycles
-	 * @return LiveData of RawPerformanceDataResult containing raw metrics, or null if not initialized
+	 * @param delaySeconds interval in seconds between data collection cycles
+	 * @return LiveData of RawPerformanceDataResult containing raw metrics, or empty LiveData if not initialized
 	 *
 	 * Steps for raw data collection:
 	 * - Check if the library has been initialized
@@ -117,15 +146,16 @@ public object DroidDex {
 	 */
 	public fun startRawPerformanceDataCollection(
 		vararg classes: Int,
-		delay: Int
-	): LiveData<RawPerformanceDataResult>? =
-		if (::performanceManagerFactory.isInitialized) {
-			performanceManagerFactory.startRawPerformanceDataCollection(*classes, delay = delay)
-		} else {
+		delaySeconds: Int
+	): LiveData<RawPerformanceDataResult> {
+		val factory = performanceManagerFactory
+		if (factory == null) {
 			val classesNames = classes.joinToString(", ") { it.name() }
 			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
-			null
+			return MutableLiveData()
 		}
+		return factory.startRawPerformanceDataCollection(*classes, delaySeconds = delaySeconds)
+	}
 
 	/**
 	 * Stops the ongoing raw performance data collection
@@ -136,16 +166,17 @@ public object DroidDex {
 	 * - Clean up resources associated with data collection
 	 */
 	public fun stopRawPerformanceDataCollection() {
-		if (::performanceManagerFactory.isInitialized) {
-			performanceManagerFactory.stopRawPerformanceDataCollection()
-		} else {
+		val factory = performanceManagerFactory
+		if (factory == null) {
 			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized"))
+			return
 		}
+		factory.stopRawPerformanceDataCollection()
 	}
 
 	/**
 	 * @param classes spread list of performance classes mapped with weight
-	 * @return WeightedPerformanceLevels containing individual and overall performance levels, or null if not initialized
+	 * @return WeightedPerformanceLevels containing individual and overall performance levels
 	 *
 	 * Steps for getting weighted performance levels:
 	 * - Check if the library has been initialized
@@ -156,20 +187,16 @@ public object DroidDex {
 	 */
 	public fun getWeightedPerformanceLevels(
 		vararg classes: Pair<@PerformanceClass Int, Float>
-	): WeightedPerformanceLevels? =
-		if (::performanceManagerFactory.isInitialized) {
-			performanceManagerFactory.getWeightedPerformanceLevels(*classes)
-		} else {
+	): WeightedPerformanceLevels {
+		val factory = performanceManagerFactory
+		if (factory == null) {
 			val classesNames = classes.joinToString(", ") { it.first.name() }
 			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
-			null
+			return WeightedPerformanceLevels(
+				overallPerformanceLevel = PerformanceLevel.UNKNOWN,
+				cpu = null, memory = null, network = null, storage = null, battery = null
+			)
 		}
-
-	private fun checkInitialized(vararg classes: Int): PerformanceLevel? {
-		if (::performanceManagerFactory.isInitialized) return null
-
-		val classesNames = classes.joinToString(", ") { it.name() }
-		logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
-		return PerformanceLevel.UNKNOWN
+		return factory.getWeightedPerformanceLevels(*classes)
 	}
 }

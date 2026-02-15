@@ -29,20 +29,29 @@ import androidx.lifecycle.MutableLiveData
 import com.blinkit.droiddex.utils.getPerformanceLevelWithWeights
 import com.blinkit.droiddex.utils.runAsyncPeriodically
 import android.os.Build
+import kotlinx.coroutines.Job
+import kotlin.concurrent.Volatile
+import java.util.concurrent.ConcurrentHashMap
 
 internal class PerformanceManagerFactory(
     private val applicationContext: Context,
     private val thresholds: PerformanceThresholds? = null
 ) {
 
-	private val performanceManagerMap = mutableMapOf<@PerformanceClass Int, PerformanceManager>()
+	private val performanceManagerMap = ConcurrentHashMap<Int, PerformanceManager>()
 	private val logger = Logger()
 
-	// Raw data collection management
-	private var rawPerformanceDataCollectionActive = false
-	private val _rawPerformanceDataLiveData = MutableLiveData<RawPerformanceDataResult>()
-	private var rawPerformanceDataClasses: IntArray = intArrayOf()
-	private var rawPerformanceDataDelay: Int = 15
+	// Atomic collection config — replaces separate volatile fields for thread safety
+	private data class CollectionConfig(val classes: Set<Int>, val delaySeconds: Int)
+
+	@Volatile
+	private var collectionConfig: CollectionConfig? = null
+
+	@Volatile
+	private var rawPerformanceDataLiveData = MutableLiveData<RawPerformanceDataResult>()
+
+	@Volatile
+	private var periodicCollectionJob: Job? = null
 
 	init {
 		PerformanceClass.values().forEach { getOrPut(it) }
@@ -60,57 +69,80 @@ internal class PerformanceManagerFactory(
 	/**
 	 * Starts continuous collection of raw performance data for specified performance classes (Flow 1)
 	 * @param classes vararg list of performance classes to monitor
-	 * @param delay interval in seconds between data collection cycles
+	 * @param delaySeconds interval in seconds between data collection cycles
 	 * @return LiveData of RawPerformanceDataResult containing raw metrics from all requested classes
 	 *
 	 * Implementation details:
-	 * - Sets collection flag and stores parameters for periodic execution
-	 * - Configures delay for all requested performance managers
-	 * - Initiates periodic data collection using runAsyncPeriodically
-	 * - Emits RawPerformanceDataResult with timestamp, device info, and raw metrics
+	 * - Synchronized to prevent TOCTOU race on concurrent start/stop calls
+	 * - Guards against double-start (returns existing LiveData if already active)
+	 * - Creates fresh LiveData to avoid sticky stale values from previous sessions
+	 * - Uses atomic CollectionConfig to prevent partial state visibility on IO threads
 	 * - Continues until stopRawPerformanceDataCollection() is called
 	 */
+	@Synchronized
 	fun startRawPerformanceDataCollection(
 		vararg classes: Int,
-		delay: Int
+		delaySeconds: Int
 	): LiveData<RawPerformanceDataResult> {
-		rawPerformanceDataCollectionActive = true
-		rawPerformanceDataClasses = classes
-		rawPerformanceDataDelay = delay
-
-		// Set unified delay for all requested performance managers
-		classes.forEach { performanceClass ->
-			getOrPut(performanceClass).setDelay(delay.toFloat())
+		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
+		if (collectionConfig != null) {
+			logger.logInfo("Raw performance data collection is already active. Call stopRawPerformanceDataCollection() first to restart with new parameters.")
+			return rawPerformanceDataLiveData
 		}
 
-		// Start periodic raw data collection
-		startPeriodicRawDataCollection()
+		val config = CollectionConfig(classes.toSet(), delaySeconds)
 
-		return _rawPerformanceDataLiveData
+		// Fresh LiveData to avoid sticky stale values from previous sessions
+		rawPerformanceDataLiveData = MutableLiveData()
+
+		// Set config AFTER setup, BEFORE starting collection — atomic visibility for IO threads
+		collectionConfig = config
+
+		startPeriodicRawDataCollection(config)
+		return rawPerformanceDataLiveData
 	}
 
-	private fun startPeriodicRawDataCollection() {
-		runAsyncPeriodically({
-			if (rawPerformanceDataCollectionActive) {
+	private fun startPeriodicRawDataCollection(config: CollectionConfig) {
+		periodicCollectionJob?.cancel()
+
+		periodicCollectionJob = runAsyncPeriodically({
+			val currentConfig = collectionConfig
+			if (currentConfig != null) {
 				try {
-					val rawData = collectRawPerformanceData()
-					_rawPerformanceDataLiveData.postValue(rawData)
+					val rawData = collectRawPerformanceData(currentConfig)
+					rawPerformanceDataLiveData.postValue(rawData)
 				} catch (e: Exception) {
 					logger.logError(e)
 				}
 			}
-		}, delayInSecs = rawPerformanceDataDelay.toFloat())
+		}, delaySeconds = config.delaySeconds.toFloat())
 	}
 
-	private fun collectRawPerformanceData(): RawPerformanceDataResult {
+	private fun collectRawPerformanceData(config: CollectionConfig): RawPerformanceDataResult {
+		val executionStartTime = System.currentTimeMillis()
+		val executionStartNanos = System.nanoTime()
+
+		// Perform all data collection using the atomic config snapshot
+		val cpuData = if (PerformanceClass.CPU in config.classes) extractCpuRawMetrics() else null
+		val memoryData = if (PerformanceClass.MEMORY in config.classes) extractMemoryRawMetrics() else null
+		val networkData = if (PerformanceClass.NETWORK in config.classes) extractNetworkRawMetrics() else null
+		val storageData = if (PerformanceClass.STORAGE in config.classes) extractStorageRawMetrics() else null
+		val batteryData = if (PerformanceClass.BATTERY in config.classes) extractBatteryRawMetrics() else null
+
+		val executionEndTime = System.currentTimeMillis()
+		val executionDurationMs = (System.nanoTime() - executionStartNanos) / 1_000_000
+
 		return RawPerformanceDataResult(
-			timestamp = System.currentTimeMillis(),
+			timestamp = executionEndTime,
 			deviceName = Build.MODEL,
-			cpu = if (PerformanceClass.CPU in rawPerformanceDataClasses) extractCpuRawMetrics() else null,
-			memory = if (PerformanceClass.MEMORY in rawPerformanceDataClasses) extractMemoryRawMetrics() else null,
-			network = if (PerformanceClass.NETWORK in rawPerformanceDataClasses) extractNetworkRawMetrics() else null,
-			storage = if (PerformanceClass.STORAGE in rawPerformanceDataClasses) extractStorageRawMetrics() else null,
-			battery = if (PerformanceClass.BATTERY in rawPerformanceDataClasses) extractBatteryRawMetrics() else null
+			cpu = cpuData,
+			memory = memoryData,
+			network = networkData,
+			storage = storageData,
+			battery = batteryData,
+			nativeExecutionStartMs = executionStartTime,
+			nativeExecutionEndMs = executionEndTime,
+			nativeExecutionDurationMs = executionDurationMs
 		)
 	}
 
@@ -129,9 +161,16 @@ internal class PerformanceManagerFactory(
 	private fun extractBatteryRawMetrics() =
 		getOrPut(PerformanceClass.BATTERY).extractRawPerformanceMetrics() as? BatteryRawPerformanceMetrics
 
+	@Synchronized
 	fun stopRawPerformanceDataCollection() {
-		rawPerformanceDataCollectionActive = false
-		rawPerformanceDataClasses = intArrayOf()
+		// Cancel job FIRST to prevent racing with the collection coroutine
+		periodicCollectionJob?.cancel()
+		periodicCollectionJob = null
+
+		collectionConfig = null
+
+		// Clear LiveData to signal completion — prevents observers from holding stale values
+		rawPerformanceDataLiveData = MutableLiveData()
 	}
 
 	/**
@@ -170,6 +209,12 @@ internal class PerformanceManagerFactory(
 			storage = individualPerformanceLevels[PerformanceClass.STORAGE],
 			battery = individualPerformanceLevels[PerformanceClass.BATTERY]
 		)
+	}
+
+	fun shutdown() {
+		stopRawPerformanceDataCollection()
+		performanceManagerMap.values.forEach { it.destroy() }
+		performanceManagerMap.clear()
 	}
 
 	private fun getOrPut(@PerformanceClass performanceClass: Int): PerformanceManager =

@@ -1,15 +1,14 @@
 package com.blinkit.droiddexexample.main
 
 import android.os.Bundle
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat.enableEdgeToEdge
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.setPadding
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Observer
 import com.blinkit.droiddex.DroidDex
+import androidx.lifecycle.LiveData
 import com.blinkit.droiddex.constants.PerformanceClass
 import com.blinkit.droiddex.constants.PerformanceClass.Companion.name
 import com.blinkit.droiddex.models.PerformanceThresholds
@@ -30,7 +29,14 @@ class MainActivity: AppCompatActivity() {
 	private val binding: ActivityMainBinding by lazy { ActivityMainBinding.inflate(layoutInflater) }
 	private lateinit var stressTestManager: StressTestManager
 	private var rawDataObserver: Observer<RawPerformanceDataResult>? = null
+	private var rawPerformanceDataLiveData: LiveData<RawPerformanceDataResult>? = null
 	private var isRawDataCollectionActive = false
+
+	// Timing tracking variables
+	private var collectionStartTime: Long = 0L
+	private var lastEventTime: Long = 0L
+	private var delaySeconds = 15
+	private var eventCount = 0
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -38,7 +44,7 @@ class MainActivity: AppCompatActivity() {
 
 		// Initialize DroidDex with custom thresholds
 		initializeDroidDexWithCustomThresholds()
-		
+
 		stressTestManager = StressTestManager(this)
 
 		binding.scrollView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
@@ -125,18 +131,18 @@ class MainActivity: AppCompatActivity() {
 		binding.btnMemoryStress.setOnClickListener {
 			stressTestManager.generateMemoryLoad()
 		}
-		
+
 		binding.btnCpuStress.setOnClickListener {
 			stressTestManager.generateCpuLoad()
 		}
-		
+
 		binding.btnNewFlows.setOnClickListener {
 			toggleRawDataCollection()
 		}
-		
+
 		updateNewFlowsButtonText()
 	}
-	
+
 	private fun toggleRawDataCollection() {
 		if (isRawDataCollectionActive) {
 			stopRawDataCollection()
@@ -144,76 +150,88 @@ class MainActivity: AppCompatActivity() {
 			startRawDataCollection()
 		}
 	}
-	
+
 	private fun updateNewFlowsButtonText() {
 		binding.btnNewFlows.text = if (isRawDataCollectionActive) {
 			"Stop Raw Data Collection"
 		} else {
-			"Start Raw Data Collection (15s intervals)"
+			"Start Raw Data Collection (10s intervals) - TIMING TEST"
 		}
 	}
-	
+
 	private fun initializeDroidDexWithCustomThresholds() {
 		// Initialize with custom thresholds to demonstrate Flow 3
 		val customThresholds = PerformanceThresholds()
 		DroidDex.init(this, customThresholds)
 		Timber.d("DroidDex initialized with custom thresholds")
 	}
-	
+
 	private fun startRawDataCollection() {
-		val liveData = DroidDex.startRawPerformanceDataCollection(
+		collectionStartTime = System.currentTimeMillis()
+		lastEventTime = 0L
+		eventCount = 0
+		delaySeconds = 10
+		rawPerformanceDataLiveData = DroidDex.startRawPerformanceDataCollection(
 			PerformanceClass.CPU,
 			PerformanceClass.MEMORY,
 			PerformanceClass.NETWORK,
 			PerformanceClass.STORAGE,
 			PerformanceClass.BATTERY,
-			delay = 15
+			delaySeconds = delaySeconds
 		)
 
 		rawDataObserver = Observer { rawData ->
-			displayRawData(rawData)
+			rawData.let { displayRawData(it) }
 		}
 
-		liveData?.observe(this, rawDataObserver!!)
+		rawPerformanceDataLiveData?.observe(this, rawDataObserver!!)
 		isRawDataCollectionActive = true
 		updateNewFlowsButtonText()
-		
+
 		Timber.d("Raw data collection started")
 	}
-	
+
 	private fun stopRawDataCollection() {
 		DroidDex.stopRawPerformanceDataCollection()
-		
+
 		rawDataObserver?.let { observer ->
-			// Remove observer if we have reference to LiveData
-			// Note: In production, you'd want to store LiveData reference to properly clean up
+			rawPerformanceDataLiveData?.removeObserver(observer)
 		}
 		rawDataObserver = null
+		rawPerformanceDataLiveData = null
 		isRawDataCollectionActive = false
 		updateNewFlowsButtonText()
-		
+
 		Timber.d("Raw data collection stopped")
 	}
-	
+
 	private fun displayRawData(rawData: RawPerformanceDataResult) {
+		val currentTime = System.currentTimeMillis()
+		eventCount++
+
+		// Calculate timing metrics
+		val actualResponseTime = if (lastEventTime > 0) {
+			currentTime - lastEventTime
+		} else {
+			currentTime - collectionStartTime
+		}
+
+		// Expected time is delay in milliseconds (+ small buffer for processing)
+		val expectedDelayMs = delaySeconds * 1000L
+		val processingTime = actualResponseTime - expectedDelayMs
+
 		// Update timestamp display
-		val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(rawData.timestamp))
-		binding.tvTimestamp.text = "Last updated: $timestamp"
-		
+		val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault()).format(java.util.Date(rawData.timestamp))
+		binding.tvTimestamp.text = "Event #$eventCount: $timestamp\nProcessing time: ${processingTime}ms"
+
+		// Store for next calculation
+		lastEventTime = currentTime
+
 		Timber.d("Raw performance data received at: %s", timestamp)
 	}
-	
-	
-	
-	
-	
-	
-	
+
 	override fun onDestroy() {
 		super.onDestroy()
-		// Stop raw data collection when activity is destroyed
-		if (isRawDataCollectionActive) {
-			DroidDex.stopRawPerformanceDataCollection()
-		}
+		DroidDex.shutdown()
 	}
 }

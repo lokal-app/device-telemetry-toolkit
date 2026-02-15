@@ -1,7 +1,6 @@
 package com.blinkit.droiddexexample
 
 import android.app.Application
-import com.blinkit.droiddex.DroidDex
 import timber.log.Timber
 
 class ExampleApplication: Application() {
@@ -10,7 +9,5 @@ class ExampleApplication: Application() {
 		super.onCreate()
 
 		Timber.plant(Timber.DebugTree())
-
-		DroidDex.init(this)
 	}
 }

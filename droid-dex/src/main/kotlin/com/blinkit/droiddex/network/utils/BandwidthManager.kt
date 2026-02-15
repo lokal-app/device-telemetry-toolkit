@@ -18,6 +18,7 @@ internal class BandwidthManager(private val logger: Logger) {
 
 	private val downloadBandwidth = ExponentialGeometricAverage(DECAY_CONSTANT)
 
+	@Synchronized
 	fun addSampleAndRecalculateBandwidthAverage(): Double {
 		val currentBytes = TrafficStats.getTotalRxBytes()
 		val currentTime = SystemClock.elapsedRealtime()

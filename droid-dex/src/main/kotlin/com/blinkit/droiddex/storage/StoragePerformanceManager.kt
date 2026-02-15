@@ -12,13 +12,16 @@ import com.blinkit.droiddex.storage.models.StorageDetailedMetrics
 import com.blinkit.droiddex.storage.models.StorageRawPerformanceMetrics
 import com.blinkit.droiddex.storage.models.StorageThresholds
 import com.blinkit.droiddex.utils.convertBytesToGB
+import kotlin.concurrent.Volatile
 
 internal class StoragePerformanceManager(
     private val thresholds: StorageThresholds = StorageThresholds()
 ): PerformanceManager() {
 
     // Storage caching - data rarely changes during app session
+    @Volatile
     private var cachedStorageData: StorageData? = null
+    @Volatile
     private var lastMeasurementTime = 0L
 
     private data class StorageData(

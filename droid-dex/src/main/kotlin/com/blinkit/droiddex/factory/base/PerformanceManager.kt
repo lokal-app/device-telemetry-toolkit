@@ -6,8 +6,10 @@ import com.blinkit.droiddex.constants.PerformanceClass
 import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.models.DetailedMetrics
 import com.blinkit.droiddex.utils.Logger
+import com.blinkit.droiddex.models.RawPerformanceMetrics
 import com.blinkit.droiddex.utils.runAsyncPeriodically
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.Job
 
 internal abstract class PerformanceManager {
 
@@ -25,47 +27,51 @@ internal abstract class PerformanceManager {
 
 	protected val logger by lazy { Logger(getPerformanceClass()) }
 
-	private var delay: Float = DEFAULT_DELAY_SECS
-
-	internal fun setDelay(delay: Float) {
-		this.delay = delay
-	}
+	private var monitoringJob: Job? = null
 
 	fun init() {
-		runAsyncPeriodically({
-			try {
-				measurePerformanceLevel().also {
-					val hasPerformanceLevelChanged = performanceLevelLd.value != it
-					if (hasPerformanceLevelChanged) {
-						performanceLevel = it
-						_performanceLevelLd.postValue(it)
-					}
-					logger.logPerformanceLevelChange(it, hasPerformanceLevelChanged)
-				}
+		monitoringJob = runAsyncPeriodically({
+			refreshPerformanceLevel()
+		}, delaySeconds = DEFAULT_DELAY_SECS)
+	}
 
-				try {
-					measureDetailedMetrics()?.let { detailedMetrics ->
-						_detailedMetricsLd.postValue(detailedMetrics)
-					}
-				} catch (e: Exception) {
-					logger.logError(e)
+	@Synchronized
+	internal fun refreshPerformanceLevel() {
+		try {
+			measurePerformanceLevel().also {
+				val hasPerformanceLevelChanged = performanceLevel != it
+				if (hasPerformanceLevelChanged) {
+					performanceLevel = it
+					_performanceLevelLd.postValue(it)
+				}
+				logger.logPerformanceLevelChange(it, hasPerformanceLevelChanged)
+			}
+
+			try {
+				measureDetailedMetrics()?.let { detailedMetrics ->
+					_detailedMetricsLd.postValue(detailedMetrics)
 				}
 			} catch (e: Exception) {
 				logger.logError(e)
 			}
-		}, delayInSecs = getDelayInSecs())
+		} catch (e: Exception) {
+			logger.logError(e)
+		}
+	}
+
+	internal fun destroy() {
+		monitoringJob?.cancel()
+		monitoringJob = null
 	}
 
 	@PerformanceClass
 	protected abstract fun getPerformanceClass(): Int
 
-	fun getDelayInSecs(): Float = delay
-
 	protected abstract fun measurePerformanceLevel(): PerformanceLevel
 
 	protected abstract fun measureDetailedMetrics(): DetailedMetrics?
 
-	internal abstract fun extractRawPerformanceMetrics(): Any?
+	internal abstract fun extractRawPerformanceMetrics(): RawPerformanceMetrics?
 
 	protected fun logInfo(message: String) = logger.logInfo(message)
 
