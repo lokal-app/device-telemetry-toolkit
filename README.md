@@ -112,11 +112,11 @@ DroidDex.shutdown()
 
 | Constant | Value | Metrics |
 |----------|-------|---------|
-| `PerformanceClass.CPU` | 0 | Core count, frequency, RAM, Android version |
-| `PerformanceClass.MEMORY` | 1 | Heap limit, heap remaining, available RAM |
-| `PerformanceClass.NETWORK` | 3 | Bandwidth, download speed, signal strength |
-| `PerformanceClass.STORAGE` | 2 | Available storage |
-| `PerformanceClass.BATTERY` | 4 | Percentage, charging status, temperature |
+| `PerformanceClass.CPU` | 0 | Core count, max/current frequency, CPU usage %, Android version |
+| `PerformanceClass.MEMORY` | 1 | Total/available RAM, RAM usage %, heap limit/used/remaining, native heap |
+| `PerformanceClass.NETWORK` | 3 | Bandwidth, download/upload speed, signal strength, cellular type, carrier |
+| `PerformanceClass.STORAGE` | 2 | Total/available storage |
+| `PerformanceClass.BATTERY` | 4 | Percentage, charging status, temperature, voltage |
 
 ### Performance Levels
 
