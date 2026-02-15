@@ -9,6 +9,8 @@ public data class CpuDetailedMetrics(
     override val performanceLevel: PerformanceLevel,
     val coreCount: Int,
     val maxCpuFrequency: Float,
+    val currentCpuFrequency: Float,
+    val currentCpuUsagePercent: Int,
     val totalRamGB: Float,
     val androidVersion: Int,
     val mediaPerformanceClass: Int,

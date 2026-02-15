@@ -99,6 +99,8 @@ internal class CpuPerformanceManager(
 	override fun measureDetailedMetrics(): DetailedMetrics {
 		val coresCount = cpuInfoManager.noOfCores
 		val maxCpuFreq = cpuInfoManager.maxCpuFreqInMHz
+		val currentCpuFreq = cpuInfoManager.currentCpuFreqInMHz
+		val currentCpuUsage = cpuInfoManager.currentCpuUsage
 		val ramInGB = getTotalRamInGB(applicationContext, logger)
 		val androidVersion = getAndroidVersion()
 		val mediaPerformanceClass = getMediaPerformanceClass()
@@ -108,6 +110,8 @@ internal class CpuPerformanceManager(
 			performanceLevel = measurePerformanceLevel(),
 			coreCount = coresCount,
 			maxCpuFrequency = maxCpuFreq.toFloat(),
+			currentCpuFrequency = currentCpuFreq.toFloat(),
+			currentCpuUsagePercent = currentCpuUsage,
 			totalRamGB = ramInGB,
 			androidVersion = androidVersion,
 			mediaPerformanceClass = mediaPerformanceClass,
@@ -118,6 +122,8 @@ internal class CpuPerformanceManager(
 	 override fun extractRawPerformanceMetrics(): CpuRawPerformanceMetrics {
 		val coresCount = cpuInfoManager.noOfCores
 		val maxCpuFreq = cpuInfoManager.maxCpuFreqInMHz
+		val currentCpuFreq = cpuInfoManager.currentCpuFreqInMHz
+		val currentCpuUsage = cpuInfoManager.currentCpuUsage
 		val ramInGB = getTotalRamInGB(applicationContext, logger)
 		val androidVersion = getAndroidVersion()
 		val mediaPerformanceClass = getMediaPerformanceClass()
@@ -126,6 +132,8 @@ internal class CpuPerformanceManager(
 		return CpuRawPerformanceMetrics(
 			coreCount = coresCount,
 			maxCpuFrequency = maxCpuFreq.toFloat(),
+			currentCpuFrequency = currentCpuFreq.toFloat(),
+			currentCpuUsagePercent = currentCpuUsage,
 			totalRamGB = ramInGB,
 			androidVersion = androidVersion,
 			mediaPerformanceClass = mediaPerformanceClass,

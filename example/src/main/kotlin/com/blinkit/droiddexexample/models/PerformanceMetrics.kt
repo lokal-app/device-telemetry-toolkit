@@ -18,6 +18,8 @@ data class CpuMetrics(
     override val performanceLevel: PerformanceLevel,
     val coreCount: Int,
     val maxCpuFrequency: Float,
+    val currentCpuFrequency: Float,
+    val currentCpuUsagePercent: Int,
     val totalRamGB: Float,
     val androidVersion: Int,
     val mediaPerformanceClass: Int,
@@ -25,8 +27,10 @@ data class CpuMetrics(
 ) : PerformanceMetrics() {
     @SuppressLint("DefaultLocale")
     override fun getDisplayMetrics() = listOf(
-        MetricItem("Core Count", coreCount.toString()),
+        MetricItem("CPU Usage", currentCpuUsagePercent.toString(), "%"),
+        MetricItem("Current CPU Freq", String.format("%.2f", currentCpuFrequency / 1000), "GHz"),
         MetricItem("Max CPU Freq", String.format("%.2f", maxCpuFrequency / 1000), "GHz"),
+        MetricItem("Core Count", coreCount.toString()),
         MetricItem("Total RAM", String.format("%.1f", totalRamGB), "GB"),
         MetricItem("Android Version", androidVersion.toString()),
         MetricItem("Media Performance Class", if (mediaPerformanceClass == 0) "0" else mediaPerformanceClass.toString()),
