@@ -20,10 +20,8 @@ data class CpuMetrics(
     val maxCpuFrequency: Float,
     val currentCpuFrequency: Float,
     val currentCpuUsagePercent: Int,
-    val totalRamGB: Float,
     val androidVersion: Int,
-    val mediaPerformanceClass: Int,
-    val heapLimitMB: Float
+    val mediaPerformanceClass: Int
 ) : PerformanceMetrics() {
     @SuppressLint("DefaultLocale")
     override fun getDisplayMetrics() = listOf(
@@ -31,10 +29,8 @@ data class CpuMetrics(
         MetricItem("Current CPU Freq", String.format("%.2f", currentCpuFrequency / 1000), "GHz"),
         MetricItem("Max CPU Freq", String.format("%.2f", maxCpuFrequency / 1000), "GHz"),
         MetricItem("Core Count", coreCount.toString()),
-        MetricItem("Total RAM", String.format("%.1f", totalRamGB), "GB"),
         MetricItem("Android Version", androidVersion.toString()),
-        MetricItem("Media Performance Class", if (mediaPerformanceClass == 0) "0" else mediaPerformanceClass.toString()),
-        MetricItem("Heap Limit", String.format("%.0f", heapLimitMB), "MB")
+        MetricItem("Media Performance Class", if (mediaPerformanceClass == 0) "0" else mediaPerformanceClass.toString())
     )
 }
 
@@ -66,8 +62,10 @@ data class NetworkMetrics(
     override val performanceLevel: PerformanceLevel,
     val bandwidthAverage: Double,
     val downloadSpeed: Int,
+    val uploadSpeed: Int,
     val networkType: String,
-    val signalLevel: Int,
+    val cellularType: String,
+    val carrierName: String,
     val signalStrength: Int,
     val isConnected: Boolean
 ) : PerformanceMetrics() {
@@ -75,9 +73,11 @@ data class NetworkMetrics(
     override fun getDisplayMetrics() = listOf(
         MetricItem("Bandwidth Avg", String.format("%.1f", bandwidthAverage), "Kb/s"),
         MetricItem("Download Speed", downloadSpeed.toString(), "Kb/s"),
+        MetricItem("Upload Speed", uploadSpeed.toString(), "Kb/s"),
         MetricItem("Network Type", networkType),
-        MetricItem("Signal Level", signalLevel.toString()),
-        MetricItem("Signal Strength", signalStrength.toString()),
+        MetricItem("Cellular Type", cellularType.ifEmpty { "N/A" }),
+        MetricItem("Carrier", carrierName.ifEmpty { "N/A" }),
+        MetricItem("Signal Strength", "$signalStrength/4"),
         MetricItem("Connected", if (isConnected) "Yes" else "No")
     )
 }

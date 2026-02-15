@@ -101,10 +101,8 @@ internal class CpuPerformanceManager(
 		val maxCpuFreq = cpuInfoManager.maxCpuFreqInMHz
 		val currentCpuFreq = cpuInfoManager.currentCpuFreqInMHz
 		val currentCpuUsage = cpuInfoManager.currentCpuUsage
-		val ramInGB = getTotalRamInGB(applicationContext, logger)
 		val androidVersion = getAndroidVersion()
 		val mediaPerformanceClass = getMediaPerformanceClass()
-		val approxHeapLimitInMB = getApproxHeapLimitInMB(logger)
 
 		return CpuDetailedMetrics(
 			performanceLevel = measurePerformanceLevel(),
@@ -112,10 +110,8 @@ internal class CpuPerformanceManager(
 			maxCpuFrequency = maxCpuFreq.toFloat(),
 			currentCpuFrequency = currentCpuFreq.toFloat(),
 			currentCpuUsagePercent = currentCpuUsage,
-			totalRamGB = ramInGB,
 			androidVersion = androidVersion,
-			mediaPerformanceClass = mediaPerformanceClass,
-			heapLimitMB = approxHeapLimitInMB
+			mediaPerformanceClass = mediaPerformanceClass
 		)
 	}
 

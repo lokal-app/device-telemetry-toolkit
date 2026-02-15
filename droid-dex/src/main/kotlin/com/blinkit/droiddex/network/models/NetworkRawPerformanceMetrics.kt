@@ -7,16 +7,20 @@ import com.blinkit.droiddex.models.RawPerformanceMetrics
 public data class NetworkRawPerformanceMetrics(
     val bandwidthAverage: Double,
     val downloadSpeed: Int,
+    val uploadSpeed: Int,
     val networkType: String,
-    val signalLevel: Int,
+    val cellularType: String,
+    val carrierName: String,
     val signalStrength: Int,
     val isConnected: Boolean
 ) : RawPerformanceMetrics {
     override fun toMap(): Map<String, Any?> = mapOf(
         "bandwidthAverage" to bandwidthAverage,
         "downloadSpeed" to downloadSpeed,
+        "uploadSpeed" to uploadSpeed,
         "networkType" to networkType,
-        "signalLevel" to signalLevel,
+        "cellularType" to cellularType,
+        "carrierName" to carrierName,
         "signalStrength" to signalStrength,
         "isConnected" to isConnected
     )

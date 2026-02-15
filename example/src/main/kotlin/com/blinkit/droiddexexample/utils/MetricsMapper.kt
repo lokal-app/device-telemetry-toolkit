@@ -15,10 +15,8 @@ fun DetailedMetrics.toExampleMetrics(): PerformanceMetrics = when (this) {
         maxCpuFrequency = maxCpuFrequency,
         currentCpuFrequency = currentCpuFrequency,
         currentCpuUsagePercent = currentCpuUsagePercent,
-        totalRamGB = totalRamGB,
         androidVersion = androidVersion,
-        mediaPerformanceClass = mediaPerformanceClass,
-        heapLimitMB = heapLimitMB
+        mediaPerformanceClass = mediaPerformanceClass
     )
     is MemoryDetailedMetrics -> MemoryMetrics(
         performanceLevel = performanceLevel,
@@ -35,8 +33,10 @@ fun DetailedMetrics.toExampleMetrics(): PerformanceMetrics = when (this) {
         performanceLevel = performanceLevel,
         bandwidthAverage = bandwidthAverage,
         downloadSpeed = downloadSpeed,
+        uploadSpeed = uploadSpeed,
         networkType = networkType,
-        signalLevel = signalLevel,
+        cellularType = cellularType,
+        carrierName = carrierName,
         signalStrength = signalStrength,
         isConnected = isConnected
     )

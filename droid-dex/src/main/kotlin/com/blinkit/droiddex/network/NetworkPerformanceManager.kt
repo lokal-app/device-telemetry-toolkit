@@ -8,6 +8,7 @@ import android.os.Build
 import android.telephony.CellInfoCdma
 import android.telephony.CellInfoGsm
 import android.telephony.CellInfoLte
+import android.telephony.CellInfoNr
 import android.telephony.CellInfoWcdma
 import android.telephony.TelephonyManager
 import androidx.annotation.IntRange
@@ -73,6 +74,13 @@ internal class NetworkPerformanceManager(
 		return (networkCapabilities?.linkDownstreamBandwidthKbps ?: 0).also { logDebug("DOWNLOAD SPEED: $it Kb/s") }
 	}
 
+	private fun getUploadSpeed(): Int {
+		val connectivityManager = getConnectivityManager() ?: return 0
+		val network = connectivityManager.activeNetwork ?: return 0
+		val networkCapabilities = connectivityManager.getNetworkCapabilities(network)
+		return (networkCapabilities?.linkUpstreamBandwidthKbps ?: 0).also { logDebug("UPLOAD SPEED: $it Kb/s") }
+	}
+
 	private fun getDownloadSpeedStrengthLevel(): PerformanceLevel {
 		val downloadSpeed = getDownloadSpeed()
 
@@ -99,6 +107,55 @@ internal class NetworkPerformanceManager(
 			activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkType.CELLULAR
 			else -> NetworkType.UNKNOWN
 		}.also { logDebug("NETWORK TYPE: ${it.name}") }
+	}
+
+	@IntRange(from = 0, to = 4)
+	private fun getSignalLevel(networkType: NetworkType): Int = when (networkType) {
+		NetworkType.WIFI -> getWifiSignalLevel()
+		NetworkType.CELLULAR -> getCellularSignalLevel()
+		else -> 0
+	}.also { logDebug("SIGNAL STRENGTH: $it/4") }
+
+	@IntRange(from = 0, to = 4)
+	private fun getCellularSignalLevel(): Int = try {
+		val telephonyManager =
+			applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+		when (val info = telephonyManager?.allCellInfo?.firstOrNull()) {
+			is CellInfoLte -> info.cellSignalStrength.level
+			is CellInfoGsm -> info.cellSignalStrength.level
+			is CellInfoCdma -> info.cellSignalStrength.level
+			is CellInfoWcdma -> info.cellSignalStrength.level
+			else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+				(info as? CellInfoNr)?.cellSignalStrength?.level ?: 0
+			} else 0
+		}
+	} catch (_: SecurityException) {
+		0
+	}.also { logDebug("CELLULAR SIGNAL LEVEL: $it") }
+
+	private fun getCellularType(networkType: NetworkType): String {
+		if (networkType != NetworkType.CELLULAR) return ""
+		val telephonyManager =
+			applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager ?: return ""
+		return try {
+			val dataNetworkType = telephonyManager.dataNetworkType
+			@Suppress("DEPRECATION") when (dataNetworkType) {
+				TelephonyManager.NETWORK_TYPE_GPRS, TelephonyManager.NETWORK_TYPE_EDGE, TelephonyManager.NETWORK_TYPE_CDMA, TelephonyManager.NETWORK_TYPE_1xRTT, TelephonyManager.NETWORK_TYPE_IDEN -> "2G"
+				TelephonyManager.NETWORK_TYPE_UMTS, TelephonyManager.NETWORK_TYPE_EVDO_0, TelephonyManager.NETWORK_TYPE_EVDO_A, TelephonyManager.NETWORK_TYPE_HSDPA, TelephonyManager.NETWORK_TYPE_HSUPA, TelephonyManager.NETWORK_TYPE_HSPA, TelephonyManager.NETWORK_TYPE_EVDO_B, TelephonyManager.NETWORK_TYPE_EHRPD, TelephonyManager.NETWORK_TYPE_HSPAP -> "3G"
+				TelephonyManager.NETWORK_TYPE_LTE -> "4G"
+				TelephonyManager.NETWORK_TYPE_NR -> "5G"
+				else -> ""
+			}
+		} catch (_: SecurityException) {
+			""
+		}.also { logDebug("CELLULAR TYPE: $it") }
+	}
+
+	private fun getCarrierName(networkType: NetworkType): String {
+		if (networkType != NetworkType.CELLULAR) return ""
+		val telephonyManager =
+			applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager ?: return ""
+		return (telephonyManager.networkOperatorName ?: "").also { logDebug("CARRIER NAME: $it") }
 	}
 
 	@IntRange(from = 0, to = 4)
@@ -179,20 +236,20 @@ internal class NetworkPerformanceManager(
 		val bandwidthAverage = bandwidthManager.addSampleAndRecalculateBandwidthAverage()
 		val isConnected = isInternetConnected()
 		val downloadSpeed = getDownloadSpeed()
+		val uploadSpeed = getUploadSpeed()
 		val networkType = getNetworkType()
-		val signalLevel = when (networkType) {
-			NetworkType.WIFI -> getWifiSignalLevel()
-			NetworkType.CELLULAR -> getCellularInternetStrength()
-			else -> 0
-		}
-		val signalStrength = signalLevel
+		val signalStrength = getSignalLevel(networkType)
+		val cellularType = getCellularType(networkType)
+		val carrierName = getCarrierName(networkType)
 
 		return NetworkDetailedMetrics(
 			performanceLevel = measurePerformanceLevel(),
 			bandwidthAverage = bandwidthAverage,
 			downloadSpeed = downloadSpeed,
+			uploadSpeed = uploadSpeed,
 			networkType = networkType.name,
-			signalLevel = signalLevel,
+			cellularType = cellularType,
+			carrierName = carrierName,
 			signalStrength = signalStrength,
 			isConnected = isConnected
 		)
@@ -202,19 +259,19 @@ internal class NetworkPerformanceManager(
 		val bandwidthAverage = bandwidthManager.addSampleAndRecalculateBandwidthAverage()
 		val isConnected = isInternetConnected()
 		val downloadSpeed = getDownloadSpeed()
+		val uploadSpeed = getUploadSpeed()
 		val networkType = getNetworkType()
-		val signalLevel = when (networkType) {
-			NetworkType.WIFI -> getWifiSignalLevel()
-			NetworkType.CELLULAR -> getCellularInternetStrength()
-			else -> 0
-		}
-		val signalStrength = signalLevel
+		val signalStrength = getSignalLevel(networkType)
+		val cellularType = getCellularType(networkType)
+		val carrierName = getCarrierName(networkType)
 
 		return NetworkRawPerformanceMetrics(
 			bandwidthAverage = bandwidthAverage,
 			downloadSpeed = downloadSpeed,
+			uploadSpeed = uploadSpeed,
 			networkType = networkType.name,
-			signalLevel = signalLevel,
+			cellularType = cellularType,
+			carrierName = carrierName,
 			signalStrength = signalStrength,
 			isConnected = isConnected
 		)

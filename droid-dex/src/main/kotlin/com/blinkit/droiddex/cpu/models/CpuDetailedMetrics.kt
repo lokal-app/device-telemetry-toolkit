@@ -11,8 +11,6 @@ public data class CpuDetailedMetrics(
     val maxCpuFrequency: Float,
     val currentCpuFrequency: Float,
     val currentCpuUsagePercent: Int,
-    val totalRamGB: Float,
     val androidVersion: Int,
-    val mediaPerformanceClass: Int,
-    val heapLimitMB: Float
+    val mediaPerformanceClass: Int
 ) : DetailedMetrics()
