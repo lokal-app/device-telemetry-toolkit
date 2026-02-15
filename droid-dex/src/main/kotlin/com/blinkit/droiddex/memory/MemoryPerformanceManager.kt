@@ -9,10 +9,12 @@ import com.blinkit.droiddex.models.DetailedMetrics
 import com.blinkit.droiddex.memory.models.MemoryDetailedMetrics
 import com.blinkit.droiddex.memory.models.MemoryRawPerformanceMetrics
 import com.blinkit.droiddex.memory.models.MemoryThresholds
+import com.blinkit.droiddex.utils.convertBytesToMB
 import com.blinkit.droiddex.utils.getApproxHeapLimitInMB
 import com.blinkit.droiddex.utils.getApproxHeapRemainingInMB
 import com.blinkit.droiddex.utils.getAvailableRamInGB
 import com.blinkit.droiddex.utils.getMemoryInfo
+import com.blinkit.droiddex.utils.getTotalRamInGB
 
 internal class MemoryPerformanceManager(
     private val applicationContext: Context,
@@ -48,35 +50,53 @@ internal class MemoryPerformanceManager(
 
 	override fun measureDetailedMetrics(): DetailedMetrics {
 		val memInfo = getMemoryInfo(applicationContext, logger)
+		val totalRamInGB = getTotalRamInGB(applicationContext, logger)
 		val availableRamInGB = getAvailableRamInGB(applicationContext, logger)
+		val ramUsagePercent = calculateRamUsagePercent(memInfo)
 		val approxHeapLimitInMB = getApproxHeapLimitInMB(logger)
 		val approxHeapRemainingInMB = getApproxHeapRemainingInMB(logger)
 		val heapUsedMB = approxHeapLimitInMB - approxHeapRemainingInMB
+		val nativeHeapAllocatedMB = convertBytesToMB(android.os.Debug.getNativeHeapAllocatedSize())
 
 		return MemoryDetailedMetrics(
 			performanceLevel = measurePerformanceLevel(),
+			totalRamGB = totalRamInGB,
 			availableRamGB = availableRamInGB,
+			ramUsagePercent = ramUsagePercent,
 			heapLimitMB = approxHeapLimitInMB,
 			heapUsedMB = heapUsedMB,
 			heapRemainingMB = approxHeapRemainingInMB,
+			nativeHeapAllocatedMB = nativeHeapAllocatedMB,
 			isLowMemory = memInfo.lowMemory
 		)
 	}
 
 	 override fun extractRawPerformanceMetrics(): MemoryRawPerformanceMetrics {
 		val memInfo = getMemoryInfo(applicationContext, logger)
+		val totalRamInGB = getTotalRamInGB(applicationContext, logger)
 		val availableRamInGB = getAvailableRamInGB(applicationContext, logger)
+		val ramUsagePercent = calculateRamUsagePercent(memInfo)
 		val approxHeapLimitInMB = getApproxHeapLimitInMB(logger)
 		val approxHeapRemainingInMB = getApproxHeapRemainingInMB(logger)
 		val heapUsedMB = approxHeapLimitInMB - approxHeapRemainingInMB
+		val nativeHeapAllocatedMB = convertBytesToMB(android.os.Debug.getNativeHeapAllocatedSize())
 
 		return MemoryRawPerformanceMetrics(
+			totalRamGB = totalRamInGB,
 			availableRamGB = availableRamInGB,
+			ramUsagePercent = ramUsagePercent,
 			heapLimitMB = approxHeapLimitInMB,
 			heapUsedMB = heapUsedMB,
 			heapRemainingMB = approxHeapRemainingInMB,
+			nativeHeapAllocatedMB = nativeHeapAllocatedMB,
 			isLowMemory = memInfo.lowMemory
 		)
+	}
+
+	private fun calculateRamUsagePercent(memInfo: android.app.ActivityManager.MemoryInfo): Int {
+		val totalMem = memInfo.totalMem
+		if (totalMem <= 0) return 0
+		return ((totalMem - memInfo.availMem) * 100 / totalMem).toInt().coerceIn(0, 100)
 	}
 
 	companion object: PerformanceManagerProvider {

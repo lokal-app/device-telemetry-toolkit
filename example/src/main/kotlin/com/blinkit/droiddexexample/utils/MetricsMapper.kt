@@ -22,10 +22,13 @@ fun DetailedMetrics.toExampleMetrics(): PerformanceMetrics = when (this) {
     )
     is MemoryDetailedMetrics -> MemoryMetrics(
         performanceLevel = performanceLevel,
+        totalRamGB = totalRamGB,
         availableRamGB = availableRamGB,
+        ramUsagePercent = ramUsagePercent,
         heapLimitMB = heapLimitMB,
         heapUsedMB = heapUsedMB,
         heapRemainingMB = heapRemainingMB,
+        nativeHeapAllocatedMB = nativeHeapAllocatedMB,
         isLowMemory = isLowMemory
     )
     is NetworkDetailedMetrics -> NetworkMetrics(

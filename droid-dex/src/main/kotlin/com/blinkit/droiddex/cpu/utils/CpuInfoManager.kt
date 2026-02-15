@@ -51,10 +51,6 @@ internal class CpuInfoManager(private val logger: Logger) {
 		get() = ((coresFreqList.map { it.max }.average()?.toLong()?.takeIf { it > 0 }?.div(1000)?.toInt())
 			?: Int.MAX_VALUE).also { logger.logDebug("MAX CPU FREQUENCY: $it MHz") }
 
-	val minCpuFreqInMHz: Int
-		get() = ((coresFreqList.map { it.min }.average()?.toLong()?.takeIf { it > 0 }?.div(1000)?.toInt())
-			?: Int.MAX_VALUE).also { logger.logDebug("MIN CPU FREQUENCY: $it MHz") }
-
 	val currentCpuFreqInMHz: Int
 		get() = ((coresFreqList.map { it.currentFreq }.average()?.toLong()?.takeIf { it > 0 }?.div(1000)?.toInt())
 			?: 0).also { logger.logDebug("CURRENT CPU FREQUENCY: $it MHz") }

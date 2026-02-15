@@ -40,18 +40,24 @@ data class CpuMetrics(
 
 data class MemoryMetrics(
     override val performanceLevel: PerformanceLevel,
+    val totalRamGB: Float,
     val availableRamGB: Float,
+    val ramUsagePercent: Int,
     val heapLimitMB: Float,
     val heapUsedMB: Float,
     val heapRemainingMB: Float,
+    val nativeHeapAllocatedMB: Float,
     val isLowMemory: Boolean
 ) : PerformanceMetrics() {
     @SuppressLint("DefaultLocale")
     override fun getDisplayMetrics() = listOf(
+        MetricItem("RAM Usage", ramUsagePercent.toString(), "%"),
+        MetricItem("Total RAM", String.format("%.1f", totalRamGB), "GB"),
         MetricItem("Available RAM", String.format("%.2f", availableRamGB), "GB"),
-        MetricItem("Heap Limit", String.format("%.1f", heapLimitMB), "MB"),
+        MetricItem("Native Heap", String.format("%.1f", nativeHeapAllocatedMB), "MB"),
         MetricItem("Heap Used", String.format("%.2f", heapUsedMB), "MB"),
         MetricItem("Heap Remaining", String.format("%.1f", heapRemainingMB), "MB"),
+        MetricItem("Heap Limit", String.format("%.1f", heapLimitMB), "MB"),
         MetricItem("Low Memory", if (isLowMemory) "Yes" else "No")
     )
 }

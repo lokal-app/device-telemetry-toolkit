@@ -9,19 +9,15 @@ public data class CpuRawPerformanceMetrics(
     val maxCpuFrequency: Float,
     val currentCpuFrequency: Float,
     val currentCpuUsagePercent: Int,
-    val totalRamGB: Float,
     val androidVersion: Int,
-    val mediaPerformanceClass: Int,
-    val heapLimitMB: Float
+    val mediaPerformanceClass: Int
 ) : RawPerformanceMetrics {
     override fun toMap(): Map<String, Any?> = mapOf(
         "coreCount" to coreCount,
         "maxCpuFrequency" to maxCpuFrequency,
         "currentCpuFrequency" to currentCpuFrequency,
         "currentCpuUsagePercent" to currentCpuUsagePercent,
-        "totalRamGB" to totalRamGB,
         "androidVersion" to androidVersion,
-        "mediaPerformanceClass" to mediaPerformanceClass,
-        "heapLimitMB" to heapLimitMB
+        "mediaPerformanceClass" to mediaPerformanceClass
     )
 }
