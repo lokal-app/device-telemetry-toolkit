@@ -2,6 +2,7 @@ package com.blinkit.droiddex.memory.models
 
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.RawPerformanceMetrics
+import com.blinkit.droiddex.utils.roundToTwoDecimals
 
 @Keep
 public data class MemoryRawPerformanceMetrics(
@@ -15,13 +16,13 @@ public data class MemoryRawPerformanceMetrics(
     val isLowMemory: Boolean
 ) : RawPerformanceMetrics {
     override fun toMap(): Map<String, Any?> = mapOf(
-        "totalRamGB" to totalRamGB,
-        "availableRamGB" to availableRamGB,
+        "totalRamGB" to totalRamGB.roundToTwoDecimals(),
+        "availableRamGB" to availableRamGB.roundToTwoDecimals(),
         "ramUsagePercent" to ramUsagePercent,
-        "heapLimitMB" to heapLimitMB,
-        "heapUsedMB" to heapUsedMB,
-        "heapRemainingMB" to heapRemainingMB,
-        "nativeHeapAllocatedMB" to nativeHeapAllocatedMB,
+        "heapLimitMB" to heapLimitMB.roundToTwoDecimals(),
+        "heapUsedMB" to heapUsedMB.roundToTwoDecimals(),
+        "heapRemainingMB" to heapRemainingMB.roundToTwoDecimals(),
+        "nativeHeapAllocatedMB" to nativeHeapAllocatedMB.roundToTwoDecimals(),
         "isLowMemory" to isLowMemory
     )
 }

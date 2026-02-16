@@ -2,6 +2,7 @@ package com.blinkit.droiddex.network.models
 
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.RawPerformanceMetrics
+import com.blinkit.droiddex.utils.roundToTwoDecimals
 
 @Keep
 public data class NetworkRawPerformanceMetrics(
@@ -15,7 +16,7 @@ public data class NetworkRawPerformanceMetrics(
     val isConnected: Boolean
 ) : RawPerformanceMetrics {
     override fun toMap(): Map<String, Any?> = mapOf(
-        "bandwidthAverage" to bandwidthAverage,
+        "bandwidthAverage" to bandwidthAverage.roundToTwoDecimals(),
         "downloadSpeed" to downloadSpeed,
         "uploadSpeed" to uploadSpeed,
         "networkType" to networkType,

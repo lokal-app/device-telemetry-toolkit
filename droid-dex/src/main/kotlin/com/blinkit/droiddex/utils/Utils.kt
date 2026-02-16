@@ -18,6 +18,9 @@ internal fun convertBytesToMB(value: Long): Float = (value * 1.0F) / (1024 * 102
 
 internal fun convertBytesToGB(value: Long): Float = convertBytesToMB(value) / 1024
 
+internal fun Float.roundToTwoDecimals(): Double = Math.round(this.toDouble() * 100) / 100.0
+internal fun Double.roundToTwoDecimals(): Double = Math.round(this * 100) / 100.0
+
 internal fun floor(value: Float): Int = kotlin.math.floor(value).roundToInt()
 
 internal fun <T: Number> List<T>.average() = if (isNotEmpty()) ceil(sumOf { it.toDouble() } / size) else null

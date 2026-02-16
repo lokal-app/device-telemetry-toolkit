@@ -2,6 +2,7 @@ package com.blinkit.droiddex.battery.models
 
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.RawPerformanceMetrics
+import com.blinkit.droiddex.utils.roundToTwoDecimals
 
 @Keep
 public data class BatteryRawPerformanceMetrics(
@@ -12,10 +13,10 @@ public data class BatteryRawPerformanceMetrics(
     val voltage: Float
 ) : RawPerformanceMetrics {
     override fun toMap(): Map<String, Any?> = mapOf(
-        "batteryPercentage" to batteryPercentage,
+        "batteryPercentage" to batteryPercentage.roundToTwoDecimals(),
         "isCharging" to isCharging,
         "batteryStatus" to batteryStatus,
-        "temperature" to temperature,
-        "voltage" to voltage
+        "temperature" to temperature.roundToTwoDecimals(),
+        "voltage" to voltage.roundToTwoDecimals()
     )
 }
