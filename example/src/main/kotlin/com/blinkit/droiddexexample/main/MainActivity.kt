@@ -20,6 +20,8 @@ import com.blinkit.droiddexexample.views.DetailedItemView
 import com.blinkit.droiddexexample.views.ItemView
 import com.blinkit.droiddexexample.utils.toExampleMetrics
 import com.blinkit.droiddexexample.utils.StressTestManager
+import android.os.Handler
+import android.os.Looper
 import timber.log.Timber
 
 private const val LOGO_HEIGHT_DP = 64
@@ -37,6 +39,11 @@ class MainActivity: AppCompatActivity() {
 	private var lastEventTime: Long = 0L
 	private var delaySeconds = 15
 	private var eventCount = 0
+
+	// Call simulation state
+	private val handler = Handler(Looper.getMainLooper())
+	private var callResumeRunnable: Runnable? = null
+	private var isCallSimulationActive = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -140,6 +147,10 @@ class MainActivity: AppCompatActivity() {
 			toggleRawDataCollection()
 		}
 
+		binding.btnSimulateCall.setOnClickListener {
+			simulateCallStart()
+		}
+
 		updateNewFlowsButtonText()
 	}
 
@@ -157,6 +168,8 @@ class MainActivity: AppCompatActivity() {
 		} else {
 			"Start Raw Data Collection (10s intervals) - TIMING TEST"
 		}
+		// Simulate Call button is only enabled when raw collection is active and no call is in progress
+		binding.btnSimulateCall.isEnabled = isRawDataCollectionActive && !isCallSimulationActive
 	}
 
 	private fun initializeDroidDexWithCustomThresholds() {
@@ -192,6 +205,9 @@ class MainActivity: AppCompatActivity() {
 	}
 
 	private fun stopRawDataCollection() {
+		// Cancel any pending call simulation
+		cancelCallSimulation()
+
 		DroidDex.stopRawPerformanceDataCollection()
 
 		rawDataObserver?.let { observer ->
@@ -203,6 +219,62 @@ class MainActivity: AppCompatActivity() {
 		updateNewFlowsButtonText()
 
 		Timber.d("Raw data collection stopped")
+	}
+
+	private fun simulateCallStart() {
+		if (!isRawDataCollectionActive || isCallSimulationActive) return
+
+		isCallSimulationActive = true
+		val callStartTime = System.currentTimeMillis()
+		val intensiveDelaySeconds = 3
+		val intensiveDurationMs = 20_000L
+		val globalDelaySeconds = 10
+
+		// Phase 1: Switch to intensive 3s collection with all classes
+		val updated = DroidDex.updateRawPerformanceDataCollection(
+			PerformanceClass.CPU,
+			PerformanceClass.MEMORY,
+			PerformanceClass.NETWORK,
+			PerformanceClass.STORAGE,
+			PerformanceClass.BATTERY,
+			delaySeconds = intensiveDelaySeconds
+		)
+
+		if (!updated) {
+			Timber.e("Failed to update collection for call simulation")
+			isCallSimulationActive = false
+			return
+		}
+
+		delaySeconds = intensiveDelaySeconds
+		binding.btnSimulateCall.isEnabled = false
+		binding.btnSimulateCall.text = "Call Active — Intensive (${intensiveDelaySeconds}s) for ${intensiveDurationMs / 1000}s..."
+		Timber.d("CALL SIMULATION: Phase 1 started — ${intensiveDelaySeconds}s intervals for ${intensiveDurationMs / 1000}s")
+
+		// Phase 2: After intensiveDurationMs, switch back to global 10s collection
+		callResumeRunnable = Runnable {
+			DroidDex.updateRawPerformanceDataCollection(
+				PerformanceClass.CPU,
+				PerformanceClass.MEMORY,
+				PerformanceClass.NETWORK,
+				PerformanceClass.STORAGE,
+				PerformanceClass.BATTERY,
+				delaySeconds = globalDelaySeconds
+			)
+			delaySeconds = globalDelaySeconds
+			isCallSimulationActive = false
+			binding.btnSimulateCall.isEnabled = true
+			binding.btnSimulateCall.text = "Simulate Call (3s for 20s, then back to 10s)"
+			val elapsed = System.currentTimeMillis() - callStartTime
+			Timber.d("CALL SIMULATION: Phase 2 — resumed ${globalDelaySeconds}s intervals (call lasted ${elapsed}ms)")
+		}
+		handler.postDelayed(callResumeRunnable!!, intensiveDurationMs)
+	}
+
+	private fun cancelCallSimulation() {
+		callResumeRunnable?.let { handler.removeCallbacks(it) }
+		callResumeRunnable = null
+		isCallSimulationActive = false
 	}
 
 	private fun displayRawData(rawData: RawPerformanceDataResult) {
@@ -231,6 +303,7 @@ class MainActivity: AppCompatActivity() {
 	}
 
 	override fun onDestroy() {
+		cancelCallSimulation()
 		super.onDestroy()
 		DroidDex.shutdown()
 	}

@@ -166,6 +166,34 @@ internal class PerformanceManagerFactory(
 	private fun extractBatteryRawMetrics() =
 		getOrPut(PerformanceClass.BATTERY).extractRawPerformanceMetrics() as? BatteryRawPerformanceMetrics
 
+	/**
+	 * Updates the active raw performance data collection with new classes and/or delay (Flow 1 — reconfigure)
+	 * @param classes new set of performance classes to monitor
+	 * @param delaySeconds new interval in seconds between data collection cycles
+	 * @return true if collection was updated, false if no active collection exists
+	 *
+	 * Implementation details:
+	 * - Cancels the current periodic job and starts a fresh one with new parameters
+	 * - Fires an immediate collection cycle with the new config (no waiting for leftover delay)
+	 * - Reuses the existing LiveData instance so observers continue receiving data seamlessly
+	 */
+	@Synchronized
+	fun updateRawPerformanceDataCollection(
+		vararg classes: Int,
+		delaySeconds: Int
+	): Boolean {
+		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
+		if (collectionConfig == null) {
+			logger.logInfo("No active raw performance data collection to update. Call startRawPerformanceDataCollection() first.")
+			return false
+		}
+
+		val config = CollectionConfig(classes.toSet(), delaySeconds)
+		collectionConfig = config
+		startPeriodicRawDataCollection(config)
+		return true
+	}
+
 	@Synchronized
 	fun stopRawPerformanceDataCollection() {
 		// Cancel job FIRST to prevent racing with the collection coroutine

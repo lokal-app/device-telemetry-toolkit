@@ -158,6 +158,31 @@ public object DroidDex {
 	}
 
 	/**
+	 * Updates the active raw performance data collection with new classes and/or delay
+	 * @param classes spread list of performance classes to monitor
+	 * @param delaySeconds new interval in seconds between data collection cycles
+	 * @return true if collection was updated, false if not initialized or no active collection
+	 *
+	 * Steps for updating collection:
+	 * - Check if the library has been initialized
+	 * - Cancel the current periodic job
+	 * - Start a new periodic job with updated parameters (fires immediately)
+	 * - Existing LiveData observers continue receiving data seamlessly
+	 */
+	public fun updateRawPerformanceDataCollection(
+		vararg classes: Int,
+		delaySeconds: Int
+	): Boolean {
+		val factory = performanceManagerFactory
+		if (factory == null) {
+			val classesNames = classes.joinToString(", ") { it.name() }
+			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
+			return false
+		}
+		return factory.updateRawPerformanceDataCollection(*classes, delaySeconds = delaySeconds)
+	}
+
+	/**
 	 * Stops the ongoing raw performance data collection
 	 *
 	 * Steps for stopping collection:

@@ -52,6 +52,16 @@
 		android:text="Test New Flows (Raw Data + Weighted Levels)"
 		android:textSize="14sp"/>
 
+	<Button
+		android:id="@+id/btn_simulate_call"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="16dp"
+		android:backgroundTint="#FF5722"
+		android:text="Simulate Call (3s for 20s, then back to 10s)"
+		android:textSize="14sp"
+		android:enabled="false"/>
+
 	<ScrollView
 		android:id="@+id/scroll_view"
 		android:layout_width="match_parent"

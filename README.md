@@ -94,9 +94,44 @@ stream.observe(this) { rawData ->
     val map = rawData.toMap()
 }
 
+// Update collection parameters on the fly (returns false if no active collection)
+DroidDex.updateRawPerformanceDataCollection(
+    PerformanceClass.CPU,
+    PerformanceClass.MEMORY,
+    delaySeconds = 3
+)
+
 // Stop when done
 DroidDex.stopRawPerformanceDataCollection()
 ```
+
+### Dynamic Reconfiguration
+
+Switch collection interval and classes mid-stream without stopping. Useful for intensive monitoring during calls or critical flows.
+
+```kotlin
+// Global collection at 10s
+DroidDex.startRawPerformanceDataCollection(
+    PerformanceClass.CPU, PerformanceClass.MEMORY,
+    PerformanceClass.NETWORK, PerformanceClass.STORAGE,
+    PerformanceClass.BATTERY, delaySeconds = 10
+)
+
+// Call starts — switch to 3s, all classes (fires immediately, no gap)
+DroidDex.updateRawPerformanceDataCollection(
+    PerformanceClass.CPU, PerformanceClass.MEMORY,
+    PerformanceClass.NETWORK, PerformanceClass.STORAGE,
+    PerformanceClass.BATTERY, delaySeconds = 3
+)
+
+// 20s later — scale back to 10s, fewer classes
+DroidDex.updateRawPerformanceDataCollection(
+    PerformanceClass.CPU, PerformanceClass.MEMORY,
+    delaySeconds = 10
+)
+```
+
+Existing LiveData observers continue receiving data seamlessly across updates.
 
 ### Lifecycle
 
@@ -141,6 +176,7 @@ DroidDex.shutdown()
 | `getDetailedMetricsLd(class)` | `LiveData<DetailedMetrics>` |
 | `getWeightedPerformanceLevels(vararg pairs)` | `WeightedPerformanceLevels` |
 | `startRawPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<RawPerformanceDataResult>` |
+| `updateRawPerformanceDataCollection(vararg classes, delaySeconds)` | `Boolean` |
 | `stopRawPerformanceDataCollection()` | `Unit` |
 
 All methods return non-null safe defaults when the SDK is not initialized.
@@ -148,7 +184,7 @@ All methods return non-null safe defaults when the SDK is not initialized.
 ## Thread Safety
 
 - `init()` and `shutdown()` are synchronized
-- `startRawPerformanceDataCollection()` and `stopRawPerformanceDataCollection()` are synchronized
+- `startRawPerformanceDataCollection()`, `updateRawPerformanceDataCollection()`, and `stopRawPerformanceDataCollection()` are synchronized
 - Shared state uses `@Volatile`, `ConcurrentHashMap`, and atomic immutable config objects
 - Monitoring runs only while the app is in the foreground (`RESUMED` state)
 
