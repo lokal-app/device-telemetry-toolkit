@@ -49,7 +49,7 @@ internal class PerformanceManagerFactory(
 
 	private val performanceManagerMap = ConcurrentHashMap<Int, PerformanceManager>()
 	private val logger = Logger()
-	private val deviceId: String = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID) ?: ""
+	private val androidId: String = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID) ?: ""
 
 	// Atomic collection config — replaces separate volatile fields for thread safety
 	private data class CollectionConfig(val classes: Set<Int>, val delaySeconds: Int)
@@ -155,7 +155,7 @@ internal class PerformanceManagerFactory(
 		return RawPerformanceDataResult(
 			timestamp = executionEndTime,
 			deviceName = Build.MODEL,
-			deviceId = deviceId,
+			androidId = androidId,
 			cpu = cpuData,
 			memory = memoryData,
 			network = networkData,
@@ -288,7 +288,7 @@ internal class PerformanceManagerFactory(
 		return DetailedPerformanceDataResult(
 			timestamp = executionEndTime,
 			deviceName = Build.MODEL,
-			deviceId = deviceId,
+			androidId = androidId,
 			cpu = cpuData,
 			memory = memoryData,
 			network = networkData,

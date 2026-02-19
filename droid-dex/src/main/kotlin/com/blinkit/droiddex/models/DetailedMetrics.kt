@@ -22,7 +22,7 @@ public abstract class DetailedMetrics {
 public data class RawPerformanceDataResult(
     val timestamp: Long,
     val deviceName: String,
-    val deviceId: String,
+    val androidId: String,
     val cpu: CpuRawPerformanceMetrics?,
     val memory: MemoryRawPerformanceMetrics?,
     val network: NetworkRawPerformanceMetrics?,
@@ -35,7 +35,7 @@ public data class RawPerformanceDataResult(
     public fun toMap(): Map<String, Any?> = mapOf(
         "timestamp" to timestamp,
         "deviceName" to deviceName,
-        "deviceId" to deviceId,
+        "androidId" to androidId,
         "cpu" to cpu?.toMap(),
         "memory" to memory?.toMap(),
         "network" to network?.toMap(),
@@ -51,7 +51,7 @@ public data class RawPerformanceDataResult(
 public data class DetailedPerformanceDataResult(
     val timestamp: Long,
     val deviceName: String,
-    val deviceId: String,
+    val androidId: String,
     val cpu: CpuDetailedMetrics?,
     val memory: MemoryDetailedMetrics?,
     val network: NetworkDetailedMetrics?,
@@ -64,7 +64,7 @@ public data class DetailedPerformanceDataResult(
     public fun toMap(): Map<String, Any?> = mapOf(
         "timestamp" to timestamp,
         "deviceName" to deviceName,
-        "deviceId" to deviceId,
+        "androidId" to androidId,
         "cpu" to cpu?.toMap(),
         "memory" to memory?.toMap(),
         "network" to network?.toMap(),
