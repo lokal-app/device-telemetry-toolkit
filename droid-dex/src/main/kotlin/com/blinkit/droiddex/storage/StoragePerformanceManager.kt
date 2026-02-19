@@ -75,12 +75,24 @@ internal class StoragePerformanceManager(
 		)
 	}
 
+	fun measurePerformanceLevel(rawMetrics: StorageRawPerformanceMetrics): PerformanceLevel {
+		val availableStorage = rawMetrics.availableStorageGB
+
+		return when {
+			availableStorage >= thresholds.excellent.availableStorageGBThreshold -> PerformanceLevel.EXCELLENT
+			availableStorage >= thresholds.high.availableStorageGBThreshold -> PerformanceLevel.HIGH
+			availableStorage >= thresholds.average.availableStorageGBThreshold -> PerformanceLevel.AVERAGE
+			availableStorage > 0 -> PerformanceLevel.LOW
+			else -> PerformanceLevel.UNKNOWN
+		}
+	}
+
 	override fun measureDetailedMetrics(): DetailedMetrics {
-		val storageData = getCachedOrFreshStorageData()
+		val rawMetrics = extractRawPerformanceMetrics()
 		return StorageDetailedMetrics(
-			performanceLevel = measurePerformanceLevel(),
-			totalStorageGB = storageData.totalStorageGB,
-			availableStorageGB = storageData.availableStorageGB
+			performanceLevel = measurePerformanceLevel(rawMetrics),
+			totalStorageGB = rawMetrics.totalStorageGB,
+			availableStorageGB = rawMetrics.availableStorageGB
 		)
 	}
 

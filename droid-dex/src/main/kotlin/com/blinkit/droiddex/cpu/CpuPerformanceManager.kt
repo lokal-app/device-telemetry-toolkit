@@ -96,22 +96,59 @@ internal class CpuPerformanceManager(
 
 	private fun getAndroidVersion() = Build.VERSION.SDK_INT.also { logDebug("ANDROID VERSION: $it") }
 
+	fun measurePerformanceLevel(rawMetrics: CpuRawPerformanceMetrics): PerformanceLevel {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			val socModel = getBuildSocModel()
+			if (lowSocModels.any { it == socModel }) {
+				logInfo("SOC MODEL: $socModel IN LIST OF LOW SOC MODELS")
+				return PerformanceLevel.LOW
+			}
+		}
+
+		val coresCount = rawMetrics.coreCount
+		val maxCpuFreq = rawMetrics.maxCpuFrequency.toLong()
+		val ramInGB = getTotalRamInGB(applicationContext, logger)
+		val androidVersion = rawMetrics.androidVersion
+		val mediaPerformanceClass = rawMetrics.mediaPerformanceClass
+		val approxHeapLimitInMB = getApproxHeapLimitInMB(logger)
+
+		return when {
+			mediaPerformanceClass >= thresholds.excellent.mediaPerformanceClassThreshold ||
+			ramInGB >= thresholds.excellent.totalRamGBThreshold -> PerformanceLevel.EXCELLENT
+
+			androidVersion < thresholds.low.androidVersionThreshold ||
+			coresCount <= thresholds.low.coreCountThreshold ||
+			approxHeapLimitInMB <= thresholds.low.heapLimitMBThreshold ||
+			(coresCount <= 4 && maxCpuFreq <= thresholds.low.maxCpuFrequencyThreshold1) ||
+			(coresCount <= 4 && maxCpuFreq <= thresholds.low.maxCpuFrequencyThreshold2 &&
+			 approxHeapLimitInMB <= thresholds.low.heapLimitMBThreshold2 &&
+			 androidVersion <= thresholds.low.androidVersionThreshold2) ||
+			(coresCount <= 4 && maxCpuFreq <= thresholds.low.maxCpuFrequencyThreshold3 &&
+			 approxHeapLimitInMB <= thresholds.low.heapLimitMBThreshold2 &&
+			 androidVersion <= thresholds.low.androidVersionThreshold3) ||
+			ramInGB <= thresholds.low.totalRamGBThreshold -> PerformanceLevel.LOW
+
+			coresCount < thresholds.average.coreCountThreshold ||
+			approxHeapLimitInMB <= thresholds.average.heapLimitMBThreshold ||
+			maxCpuFreq <= thresholds.average.maxCpuFrequencyThreshold ||
+			(coresCount == 8 && androidVersion <= thresholds.average.androidVersionThreshold) ||
+			ramInGB <= thresholds.average.totalRamGBThreshold -> PerformanceLevel.AVERAGE
+
+			else -> PerformanceLevel.HIGH
+		}
+	}
+
 	override fun measureDetailedMetrics(): DetailedMetrics {
-		val coresCount = cpuInfoManager.noOfCores
-		val maxCpuFreq = cpuInfoManager.maxCpuFreqInMHz
-		val currentCpuFreq = cpuInfoManager.currentCpuFreqInMHz
-		val currentCpuUsage = cpuInfoManager.currentCpuUsage
-		val androidVersion = getAndroidVersion()
-		val mediaPerformanceClass = getMediaPerformanceClass()
+		val rawMetrics = extractRawPerformanceMetrics()
 
 		return CpuDetailedMetrics(
-			performanceLevel = measurePerformanceLevel(),
-			coreCount = coresCount,
-			maxCpuFrequency = maxCpuFreq.toFloat(),
-			currentCpuFrequency = currentCpuFreq.toFloat(),
-			currentCpuUsagePercent = currentCpuUsage,
-			androidVersion = androidVersion,
-			mediaPerformanceClass = mediaPerformanceClass
+			performanceLevel = measurePerformanceLevel(rawMetrics),
+			coreCount = rawMetrics.coreCount,
+			maxCpuFrequency = rawMetrics.maxCpuFrequency,
+			currentCpuFrequency = rawMetrics.currentCpuFrequency,
+			currentCpuUsagePercent = rawMetrics.currentCpuUsagePercent,
+			androidVersion = rawMetrics.androidVersion,
+			mediaPerformanceClass = rawMetrics.mediaPerformanceClass
 		)
 	}
 

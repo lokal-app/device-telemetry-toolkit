@@ -33,6 +33,17 @@ internal class BatteryPerformanceManager(
 		))
 	}
 
+	fun measurePerformanceLevel(rawMetrics: BatteryRawPerformanceMetrics): PerformanceLevel {
+		val batteryPercentageLevel = getBatteryPercentageLevel(rawMetrics.batteryPercentage, rawMetrics.isCharging)
+		val temperatureLevel = getTemperatureLevel(rawMetrics.temperature)
+
+		return getPerformanceLevelWithWeights(
+			listOf(
+				Pair(batteryPercentageLevel, 2F), Pair(temperatureLevel, 1F)
+			)
+		)
+	}
+
 	private fun getBatteryPercentageLevel(batteryPercentage: Float, isCharging: Boolean): PerformanceLevel {
 		return when {
 			batteryPercentage >= thresholds.excellent.batteryPercentageThreshold ||
@@ -87,17 +98,10 @@ internal class BatteryPerformanceManager(
 
 
 	override fun measureDetailedMetrics(): DetailedMetrics {
-		val batteryMetrics = getBatteryRawMetrics() ?: return BatteryDetailedMetrics(
-			performanceLevel = PerformanceLevel.UNKNOWN,
-			batteryPercentage = 0f,
-			isCharging = false,
-			batteryStatus = "Unknown",
-			temperature = 0f,
-			voltage = 0f
-		)
+		val batteryMetrics = extractRawPerformanceMetrics()
 
 		return BatteryDetailedMetrics(
-			performanceLevel = measurePerformanceLevel(),
+			performanceLevel = measurePerformanceLevel(batteryMetrics),
 			batteryPercentage = batteryMetrics.batteryPercentage,
 			isCharging = batteryMetrics.isCharging,
 			batteryStatus = batteryMetrics.batteryStatus,

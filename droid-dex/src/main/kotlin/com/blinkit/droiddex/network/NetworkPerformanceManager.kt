@@ -51,6 +51,23 @@ internal class NetworkPerformanceManager(
 		})
 	}
 
+	fun measurePerformanceLevel(rawMetrics: NetworkRawPerformanceMetrics): PerformanceLevel {
+		if (!rawMetrics.isConnected) {
+			logInfo("DEVICE HAS NO INTERNET")
+			return PerformanceLevel.LOW
+		}
+
+		val bandwidthAverageStrengthLevel = getBandwidthAverageStrengthLevel(rawMetrics.bandwidthAverage)
+		val downloadSpeedLevel = getDownloadSpeedStrengthLevel()
+		val signalStrengthLevel = getSignalStrengthLevel()
+
+		return getPerformanceLevelWithWeights(mutableListOf<Pair<PerformanceLevel, Float>>().apply {
+			bandwidthAverageStrengthLevel?.let { add(Pair(it, 2F)) }
+			add(Pair(downloadSpeedLevel, 1F))
+			signalStrengthLevel?.let { add(Pair(it, 1F)) }
+		})
+	}
+
 	private fun isInternetConnected(): Boolean {
 		val connectivityManager = getConnectivityManager() ?: return false
 		val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
@@ -83,7 +100,6 @@ internal class NetworkPerformanceManager(
 
 	private fun getDownloadSpeedStrengthLevel(): PerformanceLevel {
 		val downloadSpeed = getDownloadSpeed()
-
 		val downloadSpeedStrengthLevel = when {
 			downloadSpeed >= thresholds.excellent.downloadSpeedThreshold -> PerformanceLevel.EXCELLENT
 			downloadSpeed >= thresholds.high.downloadSpeedThreshold -> PerformanceLevel.HIGH
@@ -233,25 +249,18 @@ internal class NetworkPerformanceManager(
 	private enum class NetworkGeneration { UNKNOWN, NETWORK_2G, NETWORK_3G, NETWORK_4G, NETWORK_5G }
 
 	override fun measureDetailedMetrics(): DetailedMetrics {
-		val bandwidthAverage = bandwidthManager.addSampleAndRecalculateBandwidthAverage()
-		val isConnected = isInternetConnected()
-		val downloadSpeed = getDownloadSpeed()
-		val uploadSpeed = getUploadSpeed()
-		val networkType = getNetworkType()
-		val signalStrength = getSignalLevel(networkType)
-		val cellularType = getCellularType(networkType)
-		val carrierName = getCarrierName(networkType)
+		val rawMetrics = extractRawPerformanceMetrics()
 
 		return NetworkDetailedMetrics(
-			performanceLevel = measurePerformanceLevel(),
-			bandwidthAverage = bandwidthAverage,
-			downloadSpeed = downloadSpeed,
-			uploadSpeed = uploadSpeed,
-			networkType = networkType.name,
-			cellularType = cellularType,
-			carrierName = carrierName,
-			signalStrength = signalStrength,
-			isConnected = isConnected
+			performanceLevel = measurePerformanceLevel(rawMetrics),
+			bandwidthAverage = rawMetrics.bandwidthAverage,
+			downloadSpeed = rawMetrics.downloadSpeed,
+			uploadSpeed = rawMetrics.uploadSpeed,
+			networkType = rawMetrics.networkType,
+			cellularType = rawMetrics.cellularType,
+			carrierName = rawMetrics.carrierName,
+			signalStrength = rawMetrics.signalStrength,
+			isConnected = rawMetrics.isConnected
 		)
 	}
 

@@ -48,26 +48,44 @@ internal class MemoryPerformanceManager(
 		}
 	}
 
+	fun measurePerformanceLevel(rawMetrics: MemoryRawPerformanceMetrics): PerformanceLevel {
+		if (rawMetrics.isLowMemory) {
+			logInfo("DEVICE HAS LOW MEMORY")
+			return PerformanceLevel.LOW
+		}
+
+		val availableRamInGB = rawMetrics.availableRamGB
+		val approxHeapLimitInMB = rawMetrics.heapLimitMB
+		val approxHeapRemainingInMB = rawMetrics.heapRemainingMB
+
+		return when {
+			approxHeapRemainingInMB <= thresholds.low.approxHeapRemainingInMBThreshold ||
+			approxHeapLimitInMB < thresholds.low.approxHeapLimitInMBThreshold -> PerformanceLevel.LOW
+
+			approxHeapRemainingInMB <= thresholds.average.approxHeapRemainingInMBThreshold ||
+			approxHeapLimitInMB < thresholds.average.approxHeapLimitInMBThreshold ||
+			availableRamInGB <= thresholds.average.availableRamGBThreshold -> PerformanceLevel.AVERAGE
+
+			approxHeapRemainingInMB <= thresholds.high.approxHeapRemainingInMBThreshold ||
+			availableRamInGB <= thresholds.high.availableRamGBThreshold -> PerformanceLevel.HIGH
+
+			else -> PerformanceLevel.EXCELLENT
+		}
+	}
+
 	override fun measureDetailedMetrics(): DetailedMetrics {
-		val memInfo = getMemoryInfo(applicationContext, logger)
-		val totalRamInGB = getTotalRamInGB(applicationContext, logger)
-		val availableRamInGB = getAvailableRamInGB(applicationContext, logger)
-		val ramUsagePercent = calculateRamUsagePercent(memInfo)
-		val approxHeapLimitInMB = getApproxHeapLimitInMB(logger)
-		val approxHeapRemainingInMB = getApproxHeapRemainingInMB(logger)
-		val heapUsedMB = approxHeapLimitInMB - approxHeapRemainingInMB
-		val nativeHeapAllocatedMB = convertBytesToMB(android.os.Debug.getNativeHeapAllocatedSize())
+		val rawMetrics = extractRawPerformanceMetrics()
 
 		return MemoryDetailedMetrics(
-			performanceLevel = measurePerformanceLevel(),
-			totalRamGB = totalRamInGB,
-			availableRamGB = availableRamInGB,
-			ramUsagePercent = ramUsagePercent,
-			heapLimitMB = approxHeapLimitInMB,
-			heapUsedMB = heapUsedMB,
-			heapRemainingMB = approxHeapRemainingInMB,
-			nativeHeapAllocatedMB = nativeHeapAllocatedMB,
-			isLowMemory = memInfo.lowMemory
+			performanceLevel = measurePerformanceLevel(rawMetrics),
+			totalRamGB = rawMetrics.totalRamGB,
+			availableRamGB = rawMetrics.availableRamGB,
+			ramUsagePercent = rawMetrics.ramUsagePercent,
+			heapLimitMB = rawMetrics.heapLimitMB,
+			heapUsedMB = rawMetrics.heapUsedMB,
+			heapRemainingMB = rawMetrics.heapRemainingMB,
+			nativeHeapAllocatedMB = rawMetrics.nativeHeapAllocatedMB,
+			isLowMemory = rawMetrics.isLowMemory
 		)
 	}
 
