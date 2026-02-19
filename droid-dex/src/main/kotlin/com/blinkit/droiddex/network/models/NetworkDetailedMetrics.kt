@@ -3,6 +3,7 @@ package com.blinkit.droiddex.network.models
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.models.DetailedMetrics
+import com.blinkit.droiddex.utils.roundToTwoDecimals
 
 @Keep
 public data class NetworkDetailedMetrics(
@@ -15,4 +16,16 @@ public data class NetworkDetailedMetrics(
     val carrierName: String,
     val signalStrength: Int,
     val isConnected: Boolean
-) : DetailedMetrics()
+) : DetailedMetrics() {
+    override fun toMap(): Map<String, Any?> = mapOf(
+        "performanceLevel" to performanceLevel.name,
+        "bandwidthAverage" to bandwidthAverage.roundToTwoDecimals(),
+        "downloadSpeed" to downloadSpeed,
+        "uploadSpeed" to uploadSpeed,
+        "networkType" to networkType,
+        "cellularType" to cellularType,
+        "carrierName" to carrierName,
+        "signalStrength" to signalStrength,
+        "isConnected" to isConnected
+    )
+}

@@ -69,7 +69,7 @@ internal abstract class PerformanceManager {
 
 	protected abstract fun measurePerformanceLevel(): PerformanceLevel
 
-	protected abstract fun measureDetailedMetrics(): DetailedMetrics?
+	internal abstract fun measureDetailedMetrics(): DetailedMetrics?
 
 	internal abstract fun extractRawPerformanceMetrics(): RawPerformanceMetrics?
 

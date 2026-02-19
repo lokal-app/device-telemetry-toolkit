@@ -69,18 +69,26 @@ result.memory                   // Individual Memory level
 val map = result.toMap()
 ```
 
-### Continuous Raw Data Collection
+### Continuous Data Collection
 
-Streams raw device metrics at a configurable interval. Executes immediately on start, then repeats.
+Two collection flows are available. Both stream data via LiveData at a configurable interval, execute immediately on start, and support mid-stream reconfiguration.
+
+| Flow | Data per cycle | Use when |
+|------|---------------|----------|
+| **Raw** | Sensor/system metrics only | You compute performance levels yourself or don't need them |
+| **Detailed** | Sensor/system metrics + performance level per class | You need a complete snapshot with classification in one object |
+
+Both flows are independent — they can run simultaneously with different intervals and classes.
+
+#### Raw Data Collection
+
+Each cycle returns `RawPerformanceDataResult` containing raw metrics per requested class.
 
 ```kotlin
-// Start collection (delaySeconds must be > 0)
 val stream = DroidDex.startRawPerformanceDataCollection(
     PerformanceClass.CPU,
     PerformanceClass.MEMORY,
     PerformanceClass.NETWORK,
-    PerformanceClass.STORAGE,
-    PerformanceClass.BATTERY,
     delaySeconds = 15
 )
 
@@ -89,25 +97,46 @@ stream.observe(this) { rawData ->
     rawData.memory?.availableRamGB
     rawData.network?.bandwidthAverage
     rawData.nativeExecutionDurationMs  // Collection cycle timing
-
-    // Serialization for bridge layers
-    val map = rawData.toMap()
 }
 
-// Update collection parameters on the fly (returns false if no active collection)
 DroidDex.updateRawPerformanceDataCollection(
+    PerformanceClass.CPU, PerformanceClass.MEMORY,
+    delaySeconds = 3  // Switch interval on the fly
+)
+
+DroidDex.stopRawPerformanceDataCollection()
+```
+
+#### Detailed Data Collection
+
+Each cycle returns `DetailedPerformanceDataResult` — same raw metrics as above, plus a computed `performanceLevel` per class.
+
+```kotlin
+val stream = DroidDex.startDetailedPerformanceDataCollection(
     PerformanceClass.CPU,
     PerformanceClass.MEMORY,
+    PerformanceClass.NETWORK,
+    delaySeconds = 15
+)
+
+stream.observe(this) { detailedData ->
+    detailedData.cpu?.coreCount              // Raw metric
+    detailedData.cpu?.performanceLevel       // Computed level (LOW, AVERAGE, HIGH, EXCELLENT)
+    detailedData.memory?.heapRemainingMB     // Raw metric
+    detailedData.memory?.performanceLevel    // Computed level
+}
+
+DroidDex.updateDetailedPerformanceDataCollection(
+    PerformanceClass.CPU, PerformanceClass.MEMORY,
     delaySeconds = 3
 )
 
-// Stop when done
-DroidDex.stopRawPerformanceDataCollection()
+DroidDex.stopDetailedPerformanceDataCollection()
 ```
 
 ### Dynamic Reconfiguration
 
-Switch collection interval and classes mid-stream without stopping. Useful for intensive monitoring during calls or critical flows.
+Both flows support `update` to switch interval and classes mid-stream without stopping. Existing LiveData observers continue receiving data seamlessly. Useful for intensive monitoring during calls or critical flows.
 
 ```kotlin
 // Global collection at 10s
@@ -117,7 +146,7 @@ DroidDex.startRawPerformanceDataCollection(
     PerformanceClass.BATTERY, delaySeconds = 10
 )
 
-// Call starts — switch to 3s, all classes (fires immediately, no gap)
+// Call starts — switch to 3s (fires immediately, no gap)
 DroidDex.updateRawPerformanceDataCollection(
     PerformanceClass.CPU, PerformanceClass.MEMORY,
     PerformanceClass.NETWORK, PerformanceClass.STORAGE,
@@ -130,8 +159,6 @@ DroidDex.updateRawPerformanceDataCollection(
     delaySeconds = 10
 )
 ```
-
-Existing LiveData observers continue receiving data seamlessly across updates.
 
 ### Lifecycle
 
@@ -178,13 +205,16 @@ DroidDex.shutdown()
 | `startRawPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<RawPerformanceDataResult>` |
 | `updateRawPerformanceDataCollection(vararg classes, delaySeconds)` | `Boolean` |
 | `stopRawPerformanceDataCollection()` | `Unit` |
+| `startDetailedPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<DetailedPerformanceDataResult>` |
+| `updateDetailedPerformanceDataCollection(vararg classes, delaySeconds)` | `Boolean` |
+| `stopDetailedPerformanceDataCollection()` | `Unit` |
 
 All methods return non-null safe defaults when the SDK is not initialized.
 
 ## Thread Safety
 
 - `init()` and `shutdown()` are synchronized
-- `startRawPerformanceDataCollection()`, `updateRawPerformanceDataCollection()`, and `stopRawPerformanceDataCollection()` are synchronized
+- All `start`/`update`/`stop` collection methods (both raw and detailed) are synchronized
 - Shared state uses `@Volatile`, `ConcurrentHashMap`, and atomic immutable config objects
 - Monitoring runs only while the app is in the foreground (`RESUMED` state)
 

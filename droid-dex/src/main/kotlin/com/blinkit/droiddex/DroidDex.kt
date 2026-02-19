@@ -9,6 +9,7 @@ import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.factory.factory.PerformanceManagerFactory
 import com.blinkit.droiddex.models.DetailedMetrics
 import com.blinkit.droiddex.models.PerformanceThresholds
+import com.blinkit.droiddex.models.DetailedPerformanceDataResult
 import com.blinkit.droiddex.models.RawPerformanceDataResult
 import com.blinkit.droiddex.models.WeightedPerformanceLevels
 import com.blinkit.droiddex.utils.Logger
@@ -197,6 +198,63 @@ public object DroidDex {
 			return
 		}
 		factory.stopRawPerformanceDataCollection()
+	}
+
+	/**
+	 * Starts continuous collection of detailed performance data for specified performance classes
+	 * @param classes spread list of performance classes to monitor
+	 * @param delaySeconds interval in seconds between data collection cycles
+	 * @return LiveData of DetailedPerformanceDataResult containing raw metrics + performance levels per class
+	 *
+	 * Steps for detailed data collection:
+	 * - Check if the library has been initialized
+	 * - Start periodic data collection for specified performance classes
+	 * - Each cycle collects raw metrics and computes performance level per class
+	 * - Return LiveData that emits DetailedPerformanceDataResult at specified intervals
+	 * - Continue until stopDetailedPerformanceDataCollection() is called
+	 */
+	public fun startDetailedPerformanceDataCollection(
+		vararg classes: Int,
+		delaySeconds: Int
+	): LiveData<DetailedPerformanceDataResult> {
+		val factory = performanceManagerFactory
+		if (factory == null) {
+			val classesNames = classes.joinToString(", ") { it.name() }
+			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
+			return MutableLiveData()
+		}
+		return factory.startDetailedPerformanceDataCollection(*classes, delaySeconds = delaySeconds)
+	}
+
+	/**
+	 * Updates the active detailed performance data collection with new classes and/or delay
+	 * @param classes spread list of performance classes to monitor
+	 * @param delaySeconds new interval in seconds between data collection cycles
+	 * @return true if collection was updated, false if not initialized or no active collection
+	 */
+	public fun updateDetailedPerformanceDataCollection(
+		vararg classes: Int,
+		delaySeconds: Int
+	): Boolean {
+		val factory = performanceManagerFactory
+		if (factory == null) {
+			val classesNames = classes.joinToString(", ") { it.name() }
+			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized for parameters: $classesNames"))
+			return false
+		}
+		return factory.updateDetailedPerformanceDataCollection(*classes, delaySeconds = delaySeconds)
+	}
+
+	/**
+	 * Stops the ongoing detailed performance data collection
+	 */
+	public fun stopDetailedPerformanceDataCollection() {
+		val factory = performanceManagerFactory
+		if (factory == null) {
+			logger.logError(UninitializedPropertyAccessException("Droid Dex is not initialized"))
+			return
+		}
+		factory.stopDetailedPerformanceDataCollection()
 	}
 
 	/**
