@@ -56,10 +56,10 @@ internal fun getPerformanceLevelLdWithWeights(
 }
 
 // Executes block immediately on first call, then repeats after delaySeconds.
-// Only runs while the app is in RESUMED state (foreground).
+// Only runs while the app is visible (foreground, PiP, split-screen).
 internal fun runAsyncPeriodically(block: () -> Unit, delaySeconds: Float) = with(ProcessLifecycleOwner.get()) {
 	lifecycleScope.launch {
-		repeatOnLifecycle(Lifecycle.State.RESUMED) {
+		repeatOnLifecycle(Lifecycle.State.STARTED) {
 			while (true) {
 				withContext(Dispatchers.IO) { block() }
 				delay((delaySeconds * 1000).toLong())
