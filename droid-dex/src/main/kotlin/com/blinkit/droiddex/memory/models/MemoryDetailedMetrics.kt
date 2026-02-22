@@ -3,7 +3,7 @@ package com.blinkit.droiddex.memory.models
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.models.DetailedMetrics
-import com.blinkit.droiddex.utils.roundToTwoDecimals
+import com.blinkit.droiddex.utils.roundToPrecision
 
 @Keep
 public data class MemoryDetailedMetrics(
@@ -19,13 +19,13 @@ public data class MemoryDetailedMetrics(
 ) : DetailedMetrics() {
     override fun toMap(): Map<String, Any?> = mapOf(
         "performanceLevel" to performanceLevel.name,
-        "totalRamGB" to totalRamGB.roundToTwoDecimals(),
-        "availableRamGB" to availableRamGB.roundToTwoDecimals(),
+        "totalRamGB" to totalRamGB.roundToPrecision(2),
+        "availableRamGB" to availableRamGB.roundToPrecision(2),
         "ramUsagePercent" to ramUsagePercent,
-        "heapLimitMB" to heapLimitMB.roundToTwoDecimals(),
-        "heapUsedMB" to heapUsedMB.roundToTwoDecimals(),
-        "heapRemainingMB" to heapRemainingMB.roundToTwoDecimals(),
-        "nativeHeapAllocatedMB" to nativeHeapAllocatedMB.roundToTwoDecimals(),
+        "heapLimitMB" to heapLimitMB.roundToPrecision(2),
+        "heapUsedMB" to heapUsedMB.roundToPrecision(2),
+        "heapRemainingMB" to heapRemainingMB.roundToPrecision(2),
+        "nativeHeapAllocatedMB" to nativeHeapAllocatedMB.roundToPrecision(2),
         "isLowMemory" to isLowMemory
     )
 }

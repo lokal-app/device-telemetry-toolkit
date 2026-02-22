@@ -2,7 +2,7 @@ package com.blinkit.droiddex.cpu.models
 
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.RawPerformanceMetrics
-import com.blinkit.droiddex.utils.roundToTwoDecimals
+import com.blinkit.droiddex.utils.roundToPrecision
 
 @Keep
 public data class CpuRawPerformanceMetrics(
@@ -15,8 +15,8 @@ public data class CpuRawPerformanceMetrics(
 ) : RawPerformanceMetrics {
     override fun toMap(): Map<String, Any?> = mapOf(
         "coreCount" to coreCount,
-        "maxCpuFrequency" to maxCpuFrequency.roundToTwoDecimals(),
-        "currentCpuFrequency" to currentCpuFrequency.roundToTwoDecimals(),
+        "maxCpuFrequency" to maxCpuFrequency.roundToPrecision(2),
+        "currentCpuFrequency" to currentCpuFrequency.roundToPrecision(2),
         "currentCpuUsagePercent" to currentCpuUsagePercent,
         "androidVersion" to androidVersion,
         "mediaPerformanceClass" to mediaPerformanceClass

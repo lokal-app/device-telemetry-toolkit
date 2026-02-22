@@ -232,11 +232,6 @@ class MainActivity: AppCompatActivity() {
 
 		// Phase 1: Switch to intensive 3s collection with all classes
 		val updated = DroidDex.updateRawPerformanceDataCollection(
-			PerformanceClass.CPU,
-			PerformanceClass.MEMORY,
-			PerformanceClass.NETWORK,
-			PerformanceClass.STORAGE,
-			PerformanceClass.BATTERY,
 			delaySeconds = intensiveDelaySeconds
 		)
 
@@ -254,11 +249,6 @@ class MainActivity: AppCompatActivity() {
 		// Phase 2: After intensiveDurationMs, switch back to global 10s collection
 		callResumeRunnable = Runnable {
 			DroidDex.updateRawPerformanceDataCollection(
-				PerformanceClass.CPU,
-				PerformanceClass.MEMORY,
-				PerformanceClass.NETWORK,
-				PerformanceClass.STORAGE,
-				PerformanceClass.BATTERY,
 				delaySeconds = globalDelaySeconds
 			)
 			delaySeconds = globalDelaySeconds

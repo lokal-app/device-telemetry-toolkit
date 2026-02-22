@@ -100,8 +100,7 @@ stream.observe(this) { rawData ->
 }
 
 DroidDex.updateRawPerformanceDataCollection(
-    PerformanceClass.CPU, PerformanceClass.MEMORY,
-    delaySeconds = 3  // Switch interval on the fly
+    delaySeconds = 3  // Switch interval on the fly (preserves original classes)
 )
 
 DroidDex.stopRawPerformanceDataCollection()
@@ -127,8 +126,7 @@ stream.observe(this) { detailedData ->
 }
 
 DroidDex.updateDetailedPerformanceDataCollection(
-    PerformanceClass.CPU, PerformanceClass.MEMORY,
-    delaySeconds = 3
+    delaySeconds = 3  // Switch interval on the fly (preserves original classes)
 )
 
 DroidDex.stopDetailedPerformanceDataCollection()
@@ -136,7 +134,7 @@ DroidDex.stopDetailedPerformanceDataCollection()
 
 ### Dynamic Reconfiguration
 
-Both flows support `update` to switch interval and classes mid-stream without stopping. Existing LiveData observers continue receiving data seamlessly. Useful for intensive monitoring during calls or critical flows.
+Both flows support `update` to switch the collection interval mid-stream without stopping. The original set of performance classes is preserved from the `start` call. Existing LiveData observers continue receiving data seamlessly. Useful for intensive monitoring during calls or critical flows.
 
 ```kotlin
 // Global collection at 10s
@@ -146,18 +144,11 @@ DroidDex.startRawPerformanceDataCollection(
     PerformanceClass.BATTERY, delaySeconds = 10
 )
 
-// Call starts — switch to 3s (fires immediately, no gap)
-DroidDex.updateRawPerformanceDataCollection(
-    PerformanceClass.CPU, PerformanceClass.MEMORY,
-    PerformanceClass.NETWORK, PerformanceClass.STORAGE,
-    PerformanceClass.BATTERY, delaySeconds = 3
-)
+// Call starts — switch to 3s (fires immediately, no gap; preserves original classes)
+DroidDex.updateRawPerformanceDataCollection(delaySeconds = 3)
 
-// 20s later — scale back to 10s, fewer classes
-DroidDex.updateRawPerformanceDataCollection(
-    PerformanceClass.CPU, PerformanceClass.MEMORY,
-    delaySeconds = 10
-)
+// 20s later — scale back to 10s
+DroidDex.updateRawPerformanceDataCollection(delaySeconds = 10)
 ```
 
 ### Lifecycle
@@ -203,10 +194,10 @@ DroidDex.shutdown()
 | `getDetailedMetricsLd(class)` | `LiveData<DetailedMetrics>` |
 | `getWeightedPerformanceLevels(vararg pairs)` | `WeightedPerformanceLevels` |
 | `startRawPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<RawPerformanceDataResult>` |
-| `updateRawPerformanceDataCollection(vararg classes, delaySeconds)` | `Boolean` |
+| `updateRawPerformanceDataCollection(delaySeconds)` | `Boolean` |
 | `stopRawPerformanceDataCollection()` | `Unit` |
 | `startDetailedPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<DetailedPerformanceDataResult>` |
-| `updateDetailedPerformanceDataCollection(vararg classes, delaySeconds)` | `Boolean` |
+| `updateDetailedPerformanceDataCollection(delaySeconds)` | `Boolean` |
 | `stopDetailedPerformanceDataCollection()` | `Unit` |
 
 All methods return non-null safe defaults when the SDK is not initialized.

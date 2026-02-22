@@ -51,27 +51,16 @@ internal class PerformanceManagerFactory(
 	private val logger = Logger()
 	private val androidId: String = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID) ?: ""
 
-	// Atomic collection config — replaces separate volatile fields for thread safety
 	private data class CollectionConfig(val classes: Set<Int>, val delaySeconds: Int)
 
-	@Volatile
-	private var collectionConfig: CollectionConfig? = null
+	private class CollectionState<T> {
+		@Volatile var config: CollectionConfig? = null
+		var liveData: MutableLiveData<T> = MutableLiveData()
+		var job: Job? = null
+	}
 
-	@Volatile
-	private var rawPerformanceDataLiveData = MutableLiveData<RawPerformanceDataResult>()
-
-	@Volatile
-	private var periodicCollectionJob: Job? = null
-
-	// Detailed performance data collection state (independent from raw flow)
-	@Volatile
-	private var detailedCollectionConfig: CollectionConfig? = null
-
-	@Volatile
-	private var detailedPerformanceDataLiveData = MutableLiveData<DetailedPerformanceDataResult>()
-
-	@Volatile
-	private var periodicDetailedCollectionJob: Job? = null
+	private val rawCollectionState = CollectionState<RawPerformanceDataResult>()
+	private val detailedCollectionState = CollectionState<DetailedPerformanceDataResult>()
 
 	init {
 		PerformanceClass.values().forEach { getOrPut(it) }
@@ -86,68 +75,145 @@ internal class PerformanceManagerFactory(
 	fun getDetailedMetricsLd(@PerformanceClass performanceClass: Int): LiveData<DetailedMetrics> =
 		getOrPut(performanceClass).detailedMetricsLd
 
+	private fun <T> startCollection(
+		state: CollectionState<T>,
+		classes: Set<Int>,
+		delaySeconds: Int,
+		collector: (CollectionConfig) -> T,
+		label: String
+	): LiveData<T> {
+		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
+		if (state.config != null) {
+			logger.logInfo("$label data collection is already active. Stop it first to restart with new parameters.")
+			return state.liveData
+		}
+
+		val config = CollectionConfig(classes, delaySeconds)
+		state.liveData = MutableLiveData()
+		state.config = config
+
+		startPeriodicCollection(state, collector)
+		return state.liveData
+	}
+
+	private fun <T> startPeriodicCollection(
+		state: CollectionState<T>,
+		collector: (CollectionConfig) -> T
+	) {
+		state.job?.cancel()
+
+		val delaySeconds = state.config?.delaySeconds ?: return
+
+		state.job = runAsyncPeriodically({
+			val currentConfig = state.config
+			if (currentConfig != null) {
+				try {
+					val result = collector(currentConfig)
+					state.liveData.postValue(result)
+				} catch (e: Exception) {
+					logger.logError(e)
+				}
+			}
+		}, delaySeconds = delaySeconds.toFloat())
+	}
+
+	private fun <T> updateCollection(
+		state: CollectionState<T>,
+		delaySeconds: Int,
+		collector: (CollectionConfig) -> T,
+		label: String
+	): Boolean {
+		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
+		if (state.config == null) {
+			logger.logInfo("No active $label data collection to update. Start it first.")
+			return false
+		}
+
+		state.config = state.config?.copy(delaySeconds = delaySeconds)
+		state.config?.let {
+			startPeriodicCollection(state, collector)
+		}
+		return true
+	}
+
+	private fun <T> stopCollection(state: CollectionState<T>) {
+		state.job?.cancel()
+		state.job = null
+		state.config = null
+		state.liveData = MutableLiveData()
+	}
+
 	/**
-	 * Starts continuous collection of raw performance data for specified performance classes (Flow 1)
-	 * @param classes vararg list of performance classes to monitor
+	 * Starts continuous collection of raw performance data for specified performance classes.
+	 * @param classes performance classes to monitor
 	 * @param delaySeconds interval in seconds between data collection cycles
-	 * @return LiveData of RawPerformanceDataResult containing raw metrics from all requested classes
-	 *
-	 * Implementation details:
-	 * - Synchronized to prevent TOCTOU race on concurrent start/stop calls
-	 * - Guards against double-start (returns existing LiveData if already active)
-	 * - Creates fresh LiveData to avoid sticky stale values from previous sessions
-	 * - Uses atomic CollectionConfig to prevent partial state visibility on IO threads
-	 * - Continues until stopRawPerformanceDataCollection() is called
+	 * @return LiveData that emits [RawPerformanceDataResult] on each collection cycle
 	 */
 	@Synchronized
 	fun startRawPerformanceDataCollection(
 		vararg classes: Int,
 		delaySeconds: Int
-	): LiveData<RawPerformanceDataResult> {
-		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
-		if (collectionConfig != null) {
-			logger.logInfo("Raw performance data collection is already active. Call stopRawPerformanceDataCollection() first to restart with new parameters.")
-			return rawPerformanceDataLiveData
-		}
+	): LiveData<RawPerformanceDataResult> =
+		startCollection(rawCollectionState, classes.toSet(), delaySeconds, ::collectRawPerformanceData, "Raw performance")
 
-		val config = CollectionConfig(classes.toSet(), delaySeconds)
+	/**
+	 * Updates the interval on the active raw performance data collection.
+	 * Preserves the original set of performance classes.
+	 * @param delaySeconds new interval in seconds between data collection cycles
+	 * @return true if updated, false if no active collection exists
+	 */
+	@Synchronized
+	fun updateRawPerformanceDataCollection(
+		delaySeconds: Int
+	): Boolean =
+		updateCollection(rawCollectionState, delaySeconds, ::collectRawPerformanceData, "Raw performance")
 
-		// Fresh LiveData to avoid sticky stale values from previous sessions
-		rawPerformanceDataLiveData = MutableLiveData()
-
-		// Set config AFTER setup, BEFORE starting collection — atomic visibility for IO threads
-		collectionConfig = config
-
-		startPeriodicRawDataCollection(config)
-		return rawPerformanceDataLiveData
+	@Synchronized
+	fun stopRawPerformanceDataCollection() {
+		stopCollection(rawCollectionState)
 	}
 
-	private fun startPeriodicRawDataCollection(config: CollectionConfig) {
-		periodicCollectionJob?.cancel()
+	/**
+	 * Starts continuous collection of detailed performance data for specified performance classes.
+	 * Independent from raw data collection — both can run simultaneously.
+	 * @param classes performance classes to monitor
+	 * @param delaySeconds interval in seconds between data collection cycles
+	 * @return LiveData that emits [DetailedPerformanceDataResult] on each collection cycle
+	 */
+	@Synchronized
+	fun startDetailedPerformanceDataCollection(
+		vararg classes: Int,
+		delaySeconds: Int
+	): LiveData<DetailedPerformanceDataResult> =
+		startCollection(detailedCollectionState, classes.toSet(), delaySeconds, ::collectDetailedPerformanceData, "Detailed performance")
 
-		periodicCollectionJob = runAsyncPeriodically({
-			val currentConfig = collectionConfig
-			if (currentConfig != null) {
-				try {
-					val rawData = collectRawPerformanceData(currentConfig)
-					rawPerformanceDataLiveData.postValue(rawData)
-				} catch (e: Exception) {
-					logger.logError(e)
-				}
-			}
-		}, delaySeconds = config.delaySeconds.toFloat())
+	/**
+	 * Updates the interval on the active detailed performance data collection.
+	 * Preserves the original set of performance classes.
+	 * @param delaySeconds new interval in seconds between data collection cycles
+	 * @return true if updated, false if no active collection exists
+	 */
+	@Synchronized
+	fun updateDetailedPerformanceDataCollection(
+		delaySeconds: Int
+	): Boolean =
+		updateCollection(detailedCollectionState, delaySeconds, ::collectDetailedPerformanceData, "detailed performance")
+
+	@Synchronized
+	fun stopDetailedPerformanceDataCollection() {
+		stopCollection(detailedCollectionState)
 	}
 
 	private fun collectRawPerformanceData(config: CollectionConfig): RawPerformanceDataResult {
 		val executionStartTime = System.currentTimeMillis()
 		val executionStartNanos = System.nanoTime()
 
-		// Perform all data collection using the atomic config snapshot
-		val cpuData = if (PerformanceClass.CPU in config.classes) extractCpuRawMetrics() else null
-		val memoryData = if (PerformanceClass.MEMORY in config.classes) extractMemoryRawMetrics() else null
-		val networkData = if (PerformanceClass.NETWORK in config.classes) extractNetworkRawMetrics() else null
-		val storageData = if (PerformanceClass.STORAGE in config.classes) extractStorageRawMetrics() else null
-		val batteryData = if (PerformanceClass.BATTERY in config.classes) extractBatteryRawMetrics() else null
+		val classes = config.classes
+		val cpuData = if (PerformanceClass.CPU in classes) getOrPut(PerformanceClass.CPU).extractRawPerformanceMetrics() as? CpuRawPerformanceMetrics else null
+		val memoryData = if (PerformanceClass.MEMORY in classes) getOrPut(PerformanceClass.MEMORY).extractRawPerformanceMetrics() as? MemoryRawPerformanceMetrics else null
+		val networkData = if (PerformanceClass.NETWORK in classes) getOrPut(PerformanceClass.NETWORK).extractRawPerformanceMetrics() as? NetworkRawPerformanceMetrics else null
+		val storageData = if (PerformanceClass.STORAGE in classes) getOrPut(PerformanceClass.STORAGE).extractRawPerformanceMetrics() as? StorageRawPerformanceMetrics else null
+		val batteryData = if (PerformanceClass.BATTERY in classes) getOrPut(PerformanceClass.BATTERY).extractRawPerformanceMetrics() as? BatteryRawPerformanceMetrics else null
 
 		val executionEndTime = System.currentTimeMillis()
 		val executionDurationMs = (System.nanoTime() - executionStartNanos) / 1_000_000
@@ -167,120 +233,16 @@ internal class PerformanceManagerFactory(
 		)
 	}
 
-	private fun extractCpuRawMetrics() =
-		getOrPut(PerformanceClass.CPU).extractRawPerformanceMetrics() as? CpuRawPerformanceMetrics
-
-	private fun extractMemoryRawMetrics() =
-		getOrPut(PerformanceClass.MEMORY).extractRawPerformanceMetrics() as? MemoryRawPerformanceMetrics
-
-	private fun extractNetworkRawMetrics() =
-		getOrPut(PerformanceClass.NETWORK).extractRawPerformanceMetrics() as? NetworkRawPerformanceMetrics
-
-	private fun extractStorageRawMetrics() =
-		getOrPut(PerformanceClass.STORAGE).extractRawPerformanceMetrics() as? StorageRawPerformanceMetrics
-
-	private fun extractBatteryRawMetrics() =
-		getOrPut(PerformanceClass.BATTERY).extractRawPerformanceMetrics() as? BatteryRawPerformanceMetrics
-
-	/**
-	 * Updates the active raw performance data collection with new classes and/or delay (Flow 1 — reconfigure)
-	 * @param classes new set of performance classes to monitor
-	 * @param delaySeconds new interval in seconds between data collection cycles
-	 * @return true if collection was updated, false if no active collection exists
-	 *
-	 * Implementation details:
-	 * - Cancels the current periodic job and starts a fresh one with new parameters
-	 * - Fires an immediate collection cycle with the new config (no waiting for leftover delay)
-	 * - Reuses the existing LiveData instance so observers continue receiving data seamlessly
-	 */
-	@Synchronized
-	fun updateRawPerformanceDataCollection(
-		vararg classes: Int,
-		delaySeconds: Int
-	): Boolean {
-		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
-		if (collectionConfig == null) {
-			logger.logInfo("No active raw performance data collection to update. Call startRawPerformanceDataCollection() first.")
-			return false
-		}
-
-		val config = CollectionConfig(classes.toSet(), delaySeconds)
-		collectionConfig = config
-		startPeriodicRawDataCollection(config)
-		return true
-	}
-
-	@Synchronized
-	fun stopRawPerformanceDataCollection() {
-		// Cancel job FIRST to prevent racing with the collection coroutine
-		periodicCollectionJob?.cancel()
-		periodicCollectionJob = null
-
-		collectionConfig = null
-
-		// Clear LiveData to signal completion — prevents observers from holding stale values
-		rawPerformanceDataLiveData = MutableLiveData()
-	}
-
-	/**
-	 * Starts continuous collection of detailed performance data for specified performance classes
-	 * @param classes vararg list of performance classes to monitor
-	 * @param delaySeconds interval in seconds between data collection cycles
-	 * @return LiveData of DetailedPerformanceDataResult containing raw metrics + performance levels
-	 *
-	 * Implementation details:
-	 * - Independent from raw data collection — both can run simultaneously
-	 * - Each cycle calls measureDetailedMetrics() which includes raw data + performance level per class
-	 * - Synchronized to prevent TOCTOU race on concurrent start/stop calls
-	 * - Guards against double-start (returns existing LiveData if already active)
-	 * - Creates fresh LiveData to avoid sticky stale values from previous sessions
-	 */
-	@Synchronized
-	fun startDetailedPerformanceDataCollection(
-		vararg classes: Int,
-		delaySeconds: Int
-	): LiveData<DetailedPerformanceDataResult> {
-		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
-		if (detailedCollectionConfig != null) {
-			logger.logInfo("Detailed performance data collection is already active. Call stopDetailedPerformanceDataCollection() first to restart with new parameters.")
-			return detailedPerformanceDataLiveData
-		}
-
-		val config = CollectionConfig(classes.toSet(), delaySeconds)
-
-		detailedPerformanceDataLiveData = MutableLiveData()
-
-		detailedCollectionConfig = config
-
-		startPeriodicDetailedDataCollection(config)
-		return detailedPerformanceDataLiveData
-	}
-
-	private fun startPeriodicDetailedDataCollection(config: CollectionConfig) {
-		periodicDetailedCollectionJob?.cancel()
-
-		periodicDetailedCollectionJob = runAsyncPeriodically({
-			val currentConfig = detailedCollectionConfig
-			if (currentConfig != null) {
-				try {
-					val detailedData = collectDetailedPerformanceData(currentConfig)
-					detailedPerformanceDataLiveData.postValue(detailedData)
-				} catch (e: Exception) {
-					logger.logError(e)
-				}
-			}
-		}, delaySeconds = config.delaySeconds.toFloat())
-	}
-
 	private fun collectDetailedPerformanceData(config: CollectionConfig): DetailedPerformanceDataResult {
 		val executionStartTime = System.currentTimeMillis()
 		val executionStartNanos = System.nanoTime()
 
-		val cpuData = if (PerformanceClass.CPU in config.classes) extractCpuDetailedMetrics() else null
-		val memoryData = if (PerformanceClass.MEMORY in config.classes) extractMemoryDetailedMetrics() else null
-		val networkData = if (PerformanceClass.NETWORK in config.classes) extractNetworkDetailedMetrics() else null
-		val storageData = if (PerformanceClass.STORAGE in config.classes) extractStorageDetailedMetrics() else null
-		val batteryData = if (PerformanceClass.BATTERY in config.classes) extractBatteryDetailedMetrics() else null
+		val classes = config.classes
+		val cpuData = if (PerformanceClass.CPU in classes) getOrPut(PerformanceClass.CPU).measureDetailedMetrics() as? CpuDetailedMetrics else null
+		val memoryData = if (PerformanceClass.MEMORY in classes) getOrPut(PerformanceClass.MEMORY).measureDetailedMetrics() as? MemoryDetailedMetrics else null
+		val networkData = if (PerformanceClass.NETWORK in classes) getOrPut(PerformanceClass.NETWORK).measureDetailedMetrics() as? NetworkDetailedMetrics else null
+		val storageData = if (PerformanceClass.STORAGE in classes) getOrPut(PerformanceClass.STORAGE).measureDetailedMetrics() as? StorageDetailedMetrics else null
+		val batteryData = if (PerformanceClass.BATTERY in classes) getOrPut(PerformanceClass.BATTERY).measureDetailedMetrics() as? BatteryDetailedMetrics else null
 
 		val executionEndTime = System.currentTimeMillis()
 		val executionDurationMs = (System.nanoTime() - executionStartNanos) / 1_000_000
@@ -300,65 +262,10 @@ internal class PerformanceManagerFactory(
 		)
 	}
 
-	private fun extractCpuDetailedMetrics() =
-		getOrPut(PerformanceClass.CPU).measureDetailedMetrics() as? CpuDetailedMetrics
-
-	private fun extractMemoryDetailedMetrics() =
-		getOrPut(PerformanceClass.MEMORY).measureDetailedMetrics() as? MemoryDetailedMetrics
-
-	private fun extractNetworkDetailedMetrics() =
-		getOrPut(PerformanceClass.NETWORK).measureDetailedMetrics() as? NetworkDetailedMetrics
-
-	private fun extractStorageDetailedMetrics() =
-		getOrPut(PerformanceClass.STORAGE).measureDetailedMetrics() as? StorageDetailedMetrics
-
-	private fun extractBatteryDetailedMetrics() =
-		getOrPut(PerformanceClass.BATTERY).measureDetailedMetrics() as? BatteryDetailedMetrics
-
 	/**
-	 * Updates the active detailed performance data collection with new classes and/or delay
-	 * @param classes new set of performance classes to monitor
-	 * @param delaySeconds new interval in seconds between data collection cycles
-	 * @return true if collection was updated, false if no active collection exists
-	 */
-	@Synchronized
-	fun updateDetailedPerformanceDataCollection(
-		vararg classes: Int,
-		delaySeconds: Int
-	): Boolean {
-		require(delaySeconds > 0) { "delaySeconds must be positive, was $delaySeconds" }
-		if (detailedCollectionConfig == null) {
-			logger.logInfo("No active detailed performance data collection to update. Call startDetailedPerformanceDataCollection() first.")
-			return false
-		}
-
-		val config = CollectionConfig(classes.toSet(), delaySeconds)
-		detailedCollectionConfig = config
-		startPeriodicDetailedDataCollection(config)
-		return true
-	}
-
-	@Synchronized
-	fun stopDetailedPerformanceDataCollection() {
-		periodicDetailedCollectionJob?.cancel()
-		periodicDetailedCollectionJob = null
-
-		detailedCollectionConfig = null
-
-		detailedPerformanceDataLiveData = MutableLiveData()
-	}
-
-	/**
-	 * Calculates weighted performance levels for specified performance classes (Flow 2)
-	 * @param classes vararg list of performance class and weight pairs
-	 * @return WeightedPerformanceLevels containing individual levels and weighted overall level
-	 *
-	 * Implementation details:
-	 * - Measures current performance level for each requested class
-	 * - Stores individual performance levels for each class
-	 * - Filters out UNKNOWN performance levels from weighted calculation
-	 * - Calculates weighted average using getPerformanceLevelWithWeights utility
-	 * - Returns structured result with both individual and overall performance levels
+	 * Calculates weighted performance levels for specified performance classes.
+	 * @param classes pairs of (performance class, weight)
+	 * @return [WeightedPerformanceLevels] with individual levels and weighted overall level
 	 */
 	fun getWeightedPerformanceLevels(
 		vararg classes: Pair<Int, Float>
@@ -367,7 +274,9 @@ internal class PerformanceManagerFactory(
 		val weightedPairs = mutableListOf<Pair<PerformanceLevel, Float>>()
 
 		classes.forEach { (performanceClass, weight) ->
-			val level = getPerformanceLevel(performanceClass)
+			val manager = getOrPut(performanceClass)
+			manager.refreshPerformanceLevel()
+			val level = manager.performanceLevel
 			individualPerformanceLevels[performanceClass] = level
 			if (level != PerformanceLevel.UNKNOWN) {
 				weightedPairs.add(Pair(level, weight))

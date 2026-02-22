@@ -3,7 +3,7 @@ package com.blinkit.droiddex.battery.models
 import androidx.annotation.Keep
 import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.models.DetailedMetrics
-import com.blinkit.droiddex.utils.roundToTwoDecimals
+import com.blinkit.droiddex.utils.roundToPrecision
 
 @Keep
 public data class BatteryDetailedMetrics(
@@ -16,10 +16,10 @@ public data class BatteryDetailedMetrics(
 ) : DetailedMetrics() {
     override fun toMap(): Map<String, Any?> = mapOf(
         "performanceLevel" to performanceLevel.name,
-        "batteryPercentage" to batteryPercentage.roundToTwoDecimals(),
+        "batteryPercentage" to batteryPercentage.roundToPrecision(2),
         "isCharging" to isCharging,
         "batteryStatus" to batteryStatus,
-        "temperature" to temperature.roundToTwoDecimals(),
-        "voltage" to voltage.roundToTwoDecimals()
+        "temperature" to temperature.roundToPrecision(2),
+        "voltage" to voltage.roundToPrecision(2)
     )
 }
