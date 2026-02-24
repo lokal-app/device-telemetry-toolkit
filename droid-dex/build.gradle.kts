@@ -15,7 +15,7 @@ publishing {
 			name = "LokalGitHubPackages"
 			url = URI("https://maven.pkg.github.com/lokal-app/device-telemetry-toolkit")
 			credentials {
-				username = "prashantdixittt"
+				username = System.getenv("GITHUB_USERNAME") ?: "lokal-app"
 				password = System.getenv("GITHUB_TOKEN") ?: ""
 			}
 		}
