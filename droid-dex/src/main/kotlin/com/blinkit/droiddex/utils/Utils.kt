@@ -6,7 +6,7 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.blinkit.droiddex.constants.PerformanceLevel
+import com.blinkit.droiddex.models.PerformanceLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,13 +52,14 @@ internal fun getPerformanceLevelLdWithWeights(
 	}
 }
 
-internal fun runAsyncPeriodically(block: () -> Unit, delayInSecs: Float) = with(ProcessLifecycleOwner.get()) {
-	block()
+// Executes block immediately on first call, then repeats after delaySeconds.
+// Only runs while the app is visible (foreground, PiP, split-screen).
+internal fun runAsyncPeriodically(block: () -> Unit, delaySeconds: Float) = with(ProcessLifecycleOwner.get()) {
 	lifecycleScope.launch {
-		repeatOnLifecycle(Lifecycle.State.RESUMED) {
+		repeatOnLifecycle(Lifecycle.State.STARTED) {
 			while (true) {
 				withContext(Dispatchers.IO) { block() }
-				delay((delayInSecs * 1000).toLong())
+				delay((delaySeconds * 1000).toLong())
 			}
 		}
 	}

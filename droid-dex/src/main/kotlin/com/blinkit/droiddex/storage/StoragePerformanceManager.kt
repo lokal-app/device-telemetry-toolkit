@@ -4,43 +4,108 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Environment
 import com.blinkit.droiddex.constants.PerformanceClass
-import com.blinkit.droiddex.constants.PerformanceLevel
+import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddex.factory.base.PerformanceManager
 import com.blinkit.droiddex.factory.providers.PerformanceManagerProvider
+import com.blinkit.droiddex.models.DetailedMetrics
+import com.blinkit.droiddex.storage.models.StorageDetailedMetrics
+import com.blinkit.droiddex.storage.models.StorageRawPerformanceMetrics
+import com.blinkit.droiddex.storage.models.StorageThresholds
 import com.blinkit.droiddex.utils.convertBytesToGB
+import kotlin.concurrent.Volatile
 
-internal class StoragePerformanceManager: PerformanceManager() {
+internal class StoragePerformanceManager(
+    private val thresholds: StorageThresholds = StorageThresholds()
+): PerformanceManager() {
+
+    // Storage caching - data rarely changes during app session
+    @Volatile
+    private var cachedStorageData: StorageData? = null
+    @Volatile
+    private var lastMeasurementTime = 0L
+
+    private data class StorageData(
+        val totalStorageGB: Float,
+        val availableStorageGB: Float
+    )
 
 	override fun getPerformanceClass() = PerformanceClass.STORAGE
 
-	override fun getDelayInSecs() = DELAY_IN_SECS
+	override fun measurePerformanceLevel(): PerformanceLevel {
+		val storageData = getCachedOrFreshStorageData()
+		val availableStorage = storageData.availableStorageGB
 
-	override fun measurePerformanceLevel() = with(getStorageLeftInGB()) {
-		when {
-			this > 16 -> PerformanceLevel.EXCELLENT
-			this > 8 -> PerformanceLevel.HIGH
-			this > 4 -> PerformanceLevel.AVERAGE
-			this > 0 -> PerformanceLevel.LOW
+		return when {
+			availableStorage >= thresholds.excellent.availableStorageGBThreshold -> PerformanceLevel.EXCELLENT
+			availableStorage >= thresholds.high.availableStorageGBThreshold -> PerformanceLevel.HIGH
+			availableStorage >= thresholds.average.availableStorageGBThreshold -> PerformanceLevel.AVERAGE
+			availableStorage > 0 -> PerformanceLevel.LOW
 			else -> PerformanceLevel.UNKNOWN
 		}
 	}
 
-	@SuppressLint("UsableSpace")
-	private fun getStorageLeftInGB(): Float {
-		val totalStorageLeft = try {
-			convertBytesToGB(Environment.getExternalStorageDirectory().usableSpace)
-		} catch (e: SecurityException) {
-			logError(e)
-			0F
+	private fun getCachedOrFreshStorageData(): StorageData {
+		val currentTime = System.currentTimeMillis()
+		val cacheValidFor = 30 * 60 * 1000L // 30 minutes cache
+
+		// Return cached data if available and still valid
+		cachedStorageData?.let { cached ->
+			if (currentTime - lastMeasurementTime < cacheValidFor) {
+				return cached
+			}
 		}
 
-		return totalStorageLeft.also { logDebug("TOTAL STORAGE LEFT: $it GB") }
+		val freshData = measureStorageData()
+		cachedStorageData = freshData
+		lastMeasurementTime = currentTime
+		return freshData
+	}
+
+	@SuppressLint("UsableSpace")
+	private fun measureStorageData(): StorageData {
+		val externalDir = Environment.getExternalStorageDirectory()
+		val totalBytes = try { externalDir.totalSpace } catch (e: SecurityException) { logError(e); 0L }
+		val availableBytes = try { externalDir.usableSpace } catch (e: SecurityException) { logError(e); 0L }
+		val totalGB = convertBytesToGB(totalBytes)
+		val availableGB = convertBytesToGB(availableBytes)
+
+		return StorageData(
+			totalStorageGB = totalGB,
+			availableStorageGB = availableGB
+		)
+	}
+
+	fun measurePerformanceLevel(rawMetrics: StorageRawPerformanceMetrics): PerformanceLevel {
+		val availableStorage = rawMetrics.availableStorageGB
+
+		return when {
+			availableStorage >= thresholds.excellent.availableStorageGBThreshold -> PerformanceLevel.EXCELLENT
+			availableStorage >= thresholds.high.availableStorageGBThreshold -> PerformanceLevel.HIGH
+			availableStorage >= thresholds.average.availableStorageGBThreshold -> PerformanceLevel.AVERAGE
+			availableStorage > 0 -> PerformanceLevel.LOW
+			else -> PerformanceLevel.UNKNOWN
+		}
+	}
+
+	override fun measureDetailedMetrics(): DetailedMetrics {
+		val rawMetrics = extractRawPerformanceMetrics()
+		return StorageDetailedMetrics(
+			performanceLevel = measurePerformanceLevel(rawMetrics),
+			totalStorageGB = rawMetrics.totalStorageGB,
+			availableStorageGB = rawMetrics.availableStorageGB
+		)
+	}
+
+	override fun extractRawPerformanceMetrics(): StorageRawPerformanceMetrics {
+		val storageData = getCachedOrFreshStorageData()
+		return StorageRawPerformanceMetrics(
+			totalStorageGB = storageData.totalStorageGB,
+			availableStorageGB = storageData.availableStorageGB
+		)
 	}
 
 	companion object: PerformanceManagerProvider {
-
-		override fun create(applicationContext: Context): PerformanceManager = StoragePerformanceManager()
-
-		private const val DELAY_IN_SECS = 600F
+		override fun create(applicationContext: Context): PerformanceManager =
+			StoragePerformanceManager()
 	}
 }

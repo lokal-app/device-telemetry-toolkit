@@ -3,7 +3,7 @@ package com.blinkit.droiddex.utils
 import com.blinkit.droiddex.BuildConfig
 import com.blinkit.droiddex.constants.PerformanceClass
 import com.blinkit.droiddex.constants.PerformanceClass.Companion.name
-import com.blinkit.droiddex.constants.PerformanceLevel
+import com.blinkit.droiddex.models.PerformanceLevel
 import timber.log.Timber
 
 internal class Logger(@PerformanceClass private val performanceClass: Int? = null) {

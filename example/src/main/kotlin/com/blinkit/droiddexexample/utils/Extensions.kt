@@ -3,7 +3,7 @@ package com.blinkit.droiddexexample.utils
 import android.content.Context
 import android.content.res.Resources
 import androidx.annotation.ColorInt
-import com.blinkit.droiddex.constants.PerformanceLevel
+import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddexexample.R
 
 fun Int.dpToPx() = (this * Resources.getSystem().displayMetrics.density)

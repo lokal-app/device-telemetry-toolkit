@@ -9,7 +9,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.animation.doOnCancel
 import androidx.core.animation.doOnEnd
 import androidx.core.view.updatePadding
-import com.blinkit.droiddex.constants.PerformanceLevel
+import com.blinkit.droiddex.models.PerformanceLevel
 import com.blinkit.droiddexexample.R
 import com.blinkit.droiddexexample.databinding.LayoutItemBinding
 import com.blinkit.droiddexexample.utils.dpToPx

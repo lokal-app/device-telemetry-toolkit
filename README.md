@@ -1,149 +1,218 @@
-[![Maven Central Version](https://img.shields.io/maven-central/v/com.eternal.kits/droid-dex?strategy=highestVersion)](https://mvnrepository.com/artifact/com.eternal.kits/droid-dex) [![GitHub Issues](https://img.shields.io/github/issues/grofers/droid-dex)](https://github.com/grofers/droid-dex/issues) [![GitHub Stars](https://img.shields.io/github/stars/grofers/droid-dex?style=flat)](https://github.com/grofers/droid-dex/stargazers) [![GitHub License](https://img.shields.io/github/license/grofers/droid-dex)](https://github.com/grofers/droid-dex?tab=GPL-2.0-1-ov-file#readme)
+# Device Telemetry Toolkit
 
-<br/>
+[![License](https://img.shields.io/badge/License-GPL--2.0-blue.svg)](https://opensource.org/licenses/GPL-2.0)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.8+-purple.svg)](https://kotlinlang.org/)
+[![Android API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 
-<!--suppress HtmlDeprecatedAttribute -->
-<div align="center">
+Android library for real-time device performance monitoring. Classifies device capability across CPU, Memory, Network, Storage, and Battery into actionable performance levels.
 
-![Droid Dex](./assets/logo.png)
+## Installation
 
-</div>
-
-## Introduction
-
-Droid Dex helps you make smart, device-aware decisions like:
-
-- Delivering high-definition images and advanced animations only to capable devices
-- Optimize layouts for mid-tier phones to prevent lag and freezes
-- Skip heavy video playback on lower-end hardware to avoid crashes
-
-It is a powerful tool that classifies and analyzes Android device performance across multiple parameters:
-
-| PARAMETER                                                                                                                  | DESCRIPTION                                         |
-|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------|
-| <div align="center">[CPU](./droid-dex/src/main/kotlin/com/blinkit/droiddex/cpu/CpuPerformanceManager.kt)</div>             | Total RAM, Core Count, CPU Frequency                |
-| <div align="center">[MEMORY](./droid-dex/src/main/kotlin/com/blinkit/droiddex/memory/MemoryPerformanceManager.kt)</div>    | Heap Limit, Heap Remaining, Available RAM           |
-| <div align="center">[NETWORK](./droid-dex/src/main/kotlin/com/blinkit/droiddex/network/NetworkPerformanceManager.kt)</div> | Bandwidth Strength, Download Speed, Signal Strength |
-| <div align="center">[STORAGE](./droid-dex/src/main/kotlin/com/blinkit/droiddex/storage/StoragePerformanceManager.kt)</div> | Available Storage                                   |
-| <div align="center">[BATTERY](./droid-dex/src/main/kotlin/com/blinkit/droiddex/battery/BatteryPerformanceManager.kt)</div> | Percentage Remaining, If Phone is Charging or Not   |
-
-into various [levels](./droid-dex/src/main/kotlin/com/blinkit/droiddex/constants/PerformanceLevel.kt): **EXCELLENT**,
-**HIGH**, **AVERAGE**, **LOW**
-
-Droid Dex enhances your Android application's performance and elevates user experience by addressing key performance
-challenges such as Janky scrolling, Out of Memory (OOM) errors, High battery consumption, and Application Not
-Responding (ANR) instances.
-
-More Info: https://lambda.blinkit.com/droid-dex-1f807901626f
-
-## Use Cases
-
-1. **Battery-Aware API Polling**: When background polling of an API is required, frequent requests can significantly
-   drain the device's battery. Use the `BATTERY` performance level to dynamically adjust polling intervals:
-
-   ```Kotlin
-   DroidDex.getPerformanceLevelLd(PerformanceClass.BATTERY).observe(this) {
-      // Adjust the polling time interval
-   }
-   ```
-
-2. **Adaptive Image Quality**: When tailoring image quality based on device capabilities, both `NETWORK` and `MEMORY`
-   conditions are important. Better image quality requires larger file sizes (impacting network) and generates heavier
-   bitmaps (consuming memory). Optimize image quality delivery using weighted performance levels:
-
-   ```Kotlin
-   DroidDex.getWeightedPerformanceLevelLd(PerformanceClass.NETWORK to 2F, PerformanceClass.MEMORY to 1F).observe(this) {
-      // Implement image quality optimization
-   }
-   ```
-
-## Usage
-
-Initialize the library in your Application class using the following code snippet:
-
-```Kotlin
-DroidDex.init(this) // Parameter: Application Context
+```gradle
+implementation 'com.lokalapps:device-telemetry-toolkit:1.0.0'
 ```
 
-1. To get performance level for single/multiple parameters:
-
-    ```Kotlin
-    DroidDex.getPerformanceLevel(params)
-    ```
-
-   For observing the changes:
-
-    ```Kotlin
-    DroidDex.getPerformanceLevelLd(params).observe(this) {
-    }
-    ```
-
-   Replace `params` with a comma-separated list of `Performance Class(es)`.
-
-   Example:
-   ```Kotlin
-   DroidDex.getPerformanceLevel(PerformanceClass.CPU, PerformanceClass.MEMORY)
-   ```
-
-2. To get performance level for multiple parameters with unequal weights:
-
-    ```Kotlin
-    DroidDex.getWeightedPerformanceLevel(params)
-    ```
-
-   For observing the changes:
-
-    ```Kotlin
-    DroidDex.getWeightedPerformanceLevelLd(params).observe(this) {
-    }
-    ```
-
-   Replace `params` with a comma-separated list of `Performance Classes` mapped to their `Weights`.
-
-   Example:
-   ```Kotlin
-   DroidDex.getWeightedPerformanceLevelLd(PerformanceClass.CPU to 2F, PerformanceClass.MEMORY to 1F).observe(this) {
-   }
-   ```
-
-See [Example Project](example) for further usage
+**Requirements:** Android API 24+ | Kotlin 1.8+ | AGP 8.0+
 
 ## Setup
 
-<details open>
-<summary>For versions 3.+</summary>
+```kotlin
+// Initialize with default thresholds
+DroidDex.init(applicationContext)
 
-The latest release is available on [Maven Central](https://central.sonatype.com/artifact/com.eternal.kits/droid-dex).
-
-```Kotlin
-implementation("com.eternal.kits:droid-dex:<<latest_version>>")
+// Or with custom thresholds
+DroidDex.init(applicationContext, PerformanceThresholds(
+    memory = MemoryThresholds(...),
+    battery = BatteryThresholds(...)
+))
 ```
 
-</details>
+## API
 
-<details>
-<summary>For versions 2.x and before</summary>
+### Performance Classification
 
-Add this to your `settings.gradle[.kts]` file
+```kotlin
+// Single category
+val cpuLevel = DroidDex.getPerformanceLevel(PerformanceClass.CPU)
 
-```Kotlin
-dependencyResolutionManagement {
-	repositories {
-		maven {
-			url = uri("https://maven.pkg.github.com/grofers/*")
-			credentials {
-				username = "Blinkit"
-				password = GITHUB_PERSONAL_ACCESS_TOKEN
-			}
-		}
-	}
+// Multiple categories (averaged)
+val level = DroidDex.getPerformanceLevel(PerformanceClass.CPU, PerformanceClass.MEMORY)
+
+// Weighted
+val weighted = DroidDex.getWeightedPerformanceLevel(
+    PerformanceClass.CPU to 2.0f,
+    PerformanceClass.MEMORY to 1.0f
+)
+
+// Reactive (LiveData)
+DroidDex.getPerformanceLevelLd(PerformanceClass.BATTERY).observe(this) { level ->
+    adjustBehavior(level)
 }
 ```
 
-And add this dependency to your project level `build.gradle[.kts]` file:
+### Weighted Performance Analysis
 
-```Kotlin
-implementation("com.blinkit.kits:droid-dex:<<your_version>>")
+Returns individual + overall performance levels in a single structured result.
+
+```kotlin
+val result = DroidDex.getWeightedPerformanceLevels(
+    PerformanceClass.CPU to 2.0f,
+    PerformanceClass.MEMORY to 1.5f,
+    PerformanceClass.NETWORK to 1.0f
+)
+
+result.overallPerformanceLevel  // Weighted average
+result.cpu                      // Individual CPU level
+result.memory                   // Individual Memory level
+
+// Serialization for bridge layers
+val map = result.toMap()
 ```
 
-</details>
+### Continuous Data Collection
+
+Two collection flows are available. Both stream data via LiveData at a configurable interval and support mid-stream reconfiguration. Collection is lifecycle-aware — it begins when the app reaches the `STARTED` state (visible, including PiP and split-screen) and pauses when the app is no longer visible.
+
+| Flow | Data per cycle | Use when |
+|------|---------------|----------|
+| **Raw** | Sensor/system metrics only | You compute performance levels yourself or don't need them |
+| **Detailed** | Sensor/system metrics + performance level per class | You need a complete snapshot with classification in one object |
+
+Both flows are independent — they can run simultaneously with different intervals and classes.
+
+#### Raw Data Collection
+
+Each cycle returns `RawPerformanceDataResult` containing raw metrics per requested class.
+
+```kotlin
+val stream = DroidDex.startRawPerformanceDataCollection(
+    PerformanceClass.CPU,
+    PerformanceClass.MEMORY,
+    PerformanceClass.NETWORK,
+    delaySeconds = 15
+)
+
+stream.observe(this) { rawData ->
+    rawData.cpu?.coreCount
+    rawData.memory?.availableRamGB
+    rawData.network?.bandwidthAverage
+    rawData.nativeExecutionDurationMs  // Collection cycle timing
+}
+
+DroidDex.updateRawPerformanceDataCollection(
+    delaySeconds = 3  // Switch interval on the fly (preserves original classes)
+)
+
+DroidDex.stopRawPerformanceDataCollection()
+```
+
+#### Detailed Data Collection
+
+Each cycle returns `DetailedPerformanceDataResult` — same raw metrics as above, plus a computed `performanceLevel` per class.
+
+```kotlin
+val stream = DroidDex.startDetailedPerformanceDataCollection(
+    PerformanceClass.CPU,
+    PerformanceClass.MEMORY,
+    PerformanceClass.NETWORK,
+    delaySeconds = 15
+)
+
+stream.observe(this) { detailedData ->
+    detailedData.cpu?.coreCount              // Raw metric
+    detailedData.cpu?.performanceLevel       // Computed level (LOW, AVERAGE, HIGH, EXCELLENT)
+    detailedData.memory?.heapRemainingMB     // Raw metric
+    detailedData.memory?.performanceLevel    // Computed level
+}
+
+DroidDex.updateDetailedPerformanceDataCollection(
+    delaySeconds = 3  // Switch interval on the fly (preserves original classes)
+)
+
+DroidDex.stopDetailedPerformanceDataCollection()
+```
+
+### Dynamic Reconfiguration
+
+Both flows support `update` to switch the collection interval mid-stream without stopping. The original set of performance classes is preserved from the `start` call. Existing LiveData observers continue receiving data seamlessly. Useful for intensive monitoring during calls or critical flows.
+
+```kotlin
+// Global collection at 10s
+DroidDex.startRawPerformanceDataCollection(
+    PerformanceClass.CPU, PerformanceClass.MEMORY,
+    PerformanceClass.NETWORK, PerformanceClass.STORAGE,
+    PerformanceClass.BATTERY, delaySeconds = 10
+)
+
+// Call starts — switch to 3s (fires immediately, no gap; preserves original classes)
+DroidDex.updateRawPerformanceDataCollection(delaySeconds = 3)
+
+// 20s later — scale back to 10s
+DroidDex.updateRawPerformanceDataCollection(delaySeconds = 10)
+```
+
+### Lifecycle
+
+```kotlin
+// Clean shutdown — cancels all monitoring coroutines and releases resources.
+// Required before re-initialization.
+DroidDex.shutdown()
+```
+
+## Reference
+
+### Performance Classes
+
+| Constant | Value | Metrics |
+|----------|-------|---------|
+| `PerformanceClass.CPU` | 0 | Core count, max/current frequency, CPU usage %, Android version |
+| `PerformanceClass.MEMORY` | 1 | Total/available RAM, RAM usage %, heap limit/used/remaining, native heap |
+| `PerformanceClass.NETWORK` | 3 | Bandwidth, download/upload speed, signal strength, cellular type, carrier |
+| `PerformanceClass.STORAGE` | 2 | Total/available storage |
+| `PerformanceClass.BATTERY` | 4 | Percentage, charging status, temperature, voltage |
+
+### Performance Levels
+
+| Level | Value | Description |
+|-------|-------|-------------|
+| `UNKNOWN` | 0 | Unable to determine |
+| `LOW` | 1 | Entry-level device |
+| `AVERAGE` | 2 | Mid-tier device |
+| `HIGH` | 3 | High-end device |
+| `EXCELLENT` | 4 | Top-tier device |
+
+### Public API
+
+| Method | Returns |
+|--------|---------|
+| `init(context, thresholds?)` | `Unit` |
+| `shutdown()` | `Unit` |
+| `getPerformanceLevel(vararg classes)` | `PerformanceLevel` |
+| `getPerformanceLevelLd(vararg classes)` | `LiveData<PerformanceLevel>` |
+| `getWeightedPerformanceLevel(vararg pairs)` | `PerformanceLevel` |
+| `getWeightedPerformanceLevelLd(vararg pairs)` | `LiveData<PerformanceLevel>` |
+| `getDetailedMetricsLd(class)` | `LiveData<DetailedMetrics>` |
+| `getWeightedPerformanceLevels(vararg pairs)` | `WeightedPerformanceLevels` |
+| `startRawPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<RawPerformanceDataResult>` |
+| `updateRawPerformanceDataCollection(delaySeconds)` | `Boolean` |
+| `stopRawPerformanceDataCollection()` | `Unit` |
+| `startDetailedPerformanceDataCollection(vararg classes, delaySeconds)` | `LiveData<DetailedPerformanceDataResult>` |
+| `updateDetailedPerformanceDataCollection(delaySeconds)` | `Boolean` |
+| `stopDetailedPerformanceDataCollection()` | `Unit` |
+
+All methods return non-null safe defaults when the SDK is not initialized.
+
+## Thread Safety
+
+- `init()` and `shutdown()` are synchronized
+- All `start`/`update`/`stop` collection methods (both raw and detailed) are synchronized
+- Shared state uses `@Volatile`, `ConcurrentHashMap`, and atomic immutable config objects
+- Monitoring runs only while the app is visible (`STARTED` state — includes PiP and split-screen)
+
+## License
+
+GNU General Public License v2.0 — see [LICENSE](LICENSE).
+
+## Acknowledgments
+
+Fork of [grofers/droid-dex](https://github.com/grofers/droid-dex) with continuous telemetry collection, weighted analysis, structured serialization, and lifecycle management.
