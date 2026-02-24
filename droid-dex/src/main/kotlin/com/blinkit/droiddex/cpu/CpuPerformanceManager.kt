@@ -1,5 +1,6 @@
 package com.blinkit.droiddex.cpu
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -15,6 +16,7 @@ import com.blinkit.droiddex.cpu.models.CpuThresholds
 import com.blinkit.droiddex.models.DetailedMetrics
 import com.blinkit.droiddex.utils.getApproxHeapLimitInMB
 import com.blinkit.droiddex.utils.getTotalRamInGB
+import kotlin.concurrent.Volatile
 import java.util.Locale
 
 /**
@@ -26,8 +28,6 @@ internal class CpuPerformanceManager(
 ): PerformanceManager() {
 
 	private val cpuInfoManager by lazy { CpuInfoManager(logger) }
-
-	private val devicePerformance by lazy { PlayServicesDevicePerformance(applicationContext) }
 
 	private val lowSocModels = intArrayOf(
 		-1775228513,  // EXYNOS 850
@@ -92,7 +92,7 @@ internal class CpuPerformanceManager(
 	private fun getBuildSocModel() = Build.SOC_MODEL.uppercase(Locale.getDefault()).hashCode()
 
 	private fun getMediaPerformanceClass() =
-		devicePerformance.mediaPerformanceClass.also { logDebug("MEDIA PERFORMANCE CLASS: $it") }
+		getDevicePerformance(applicationContext).mediaPerformanceClass.also { logDebug("MEDIA PERFORMANCE CLASS: $it") }
 
 	private fun getAndroidVersion() = Build.VERSION.SDK_INT.also { logDebug("ANDROID VERSION: $it") }
 
@@ -171,6 +171,19 @@ internal class CpuPerformanceManager(
 	}
 
 	companion object: PerformanceManagerProvider {
+		// Safe: only applicationContext is stored, which lives for the entire process
+		@SuppressLint("StaticFieldLeak")
+		@Volatile
+		private var devicePerformance: PlayServicesDevicePerformance? = null
+
+		private fun getDevicePerformance(context: Context): PlayServicesDevicePerformance {
+			return devicePerformance ?: synchronized(this) {
+				devicePerformance ?: PlayServicesDevicePerformance(context.applicationContext).also {
+					devicePerformance = it
+				}
+			}
+		}
+
 		override fun create(applicationContext: Context): PerformanceManager = CpuPerformanceManager(applicationContext)
 	}
 }
