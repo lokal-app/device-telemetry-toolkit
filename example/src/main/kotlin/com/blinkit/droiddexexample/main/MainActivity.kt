@@ -89,7 +89,7 @@ class MainActivity: AppCompatActivity() {
 		}
 
 		// Set up detailed metrics observation
-		DroidDex.getDetailedMetricsLd(performanceClass)?.observe(this) { detailedMetrics ->
+		DroidDex.getDetailedMetricsLd(performanceClass).observe(this) { detailedMetrics ->
 			val metrics = detailedMetrics.toExampleMetrics()
 			// Update with detailed metrics
 			item.set(metrics.performanceLevel, getClassName(performanceClass), metrics)

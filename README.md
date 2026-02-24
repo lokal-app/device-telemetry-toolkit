@@ -71,7 +71,7 @@ val map = result.toMap()
 
 ### Continuous Data Collection
 
-Two collection flows are available. Both stream data via LiveData at a configurable interval, execute immediately on start, and support mid-stream reconfiguration.
+Two collection flows are available. Both stream data via LiveData at a configurable interval and support mid-stream reconfiguration. Collection is lifecycle-aware — it begins when the app reaches the `STARTED` state (visible, including PiP and split-screen) and pauses when the app is no longer visible.
 
 | Flow | Data per cycle | Use when |
 |------|---------------|----------|
@@ -207,7 +207,7 @@ All methods return non-null safe defaults when the SDK is not initialized.
 - `init()` and `shutdown()` are synchronized
 - All `start`/`update`/`stop` collection methods (both raw and detailed) are synchronized
 - Shared state uses `@Volatile`, `ConcurrentHashMap`, and atomic immutable config objects
-- Monitoring runs only while the app is in the foreground (`RESUMED` state)
+- Monitoring runs only while the app is visible (`STARTED` state — includes PiP and split-screen)
 
 ## License
 
