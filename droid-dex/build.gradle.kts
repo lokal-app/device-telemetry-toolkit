@@ -12,11 +12,11 @@ plugins {
 publishing {
 	repositories {
 		maven {
-			name = "Blinkit"
-			url = URI("https://maven.pkg.github.com/grofers/droid-dex")
+			name = "LokalGitHubPackages"
+			url = URI("https://maven.pkg.github.com/lokal-app/device-telemetry-toolkit")
 			credentials {
-				username = "Blinkit"
-				password = System.getenv("READ_ARTIFACTS_TOKEN")
+				username = "prashantdixittt"
+				password = System.getenv("GITHUB_TOKEN") ?: ""
 			}
 		}
 	}
