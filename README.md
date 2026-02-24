@@ -8,9 +8,27 @@ Android library for real-time device performance monitoring. Classifies device c
 
 ## Installation
 
+This library is hosted on **GitHub Packages**. Add the Maven repository and dependency:
+
 ```gradle
+// In your project's build.gradle or settings.gradle
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/lokal-app/device-telemetry-toolkit")
+        credentials {
+            username = System.getenv("GITHUB_USERNAME") ?: "lokal-app"
+            password = System.getenv("GITHUB_TOKEN") ?: ""
+        }
+    }
+}
+```
+
+```gradle
+// In your module's build.gradle
 implementation 'com.lokalapps:device-telemetry-toolkit:1.0.0'
 ```
+
+A GitHub Personal Access Token with `read:packages` scope is required. Set it as the `GITHUB_TOKEN` environment variable.
 
 **Requirements:** Android API 24+ | Kotlin 1.8+ | AGP 8.0+
 
@@ -208,6 +226,25 @@ All methods return non-null safe defaults when the SDK is not initialized.
 - All `start`/`update`/`stop` collection methods (both raw and detailed) are synchronized
 - Shared state uses `@Volatile`, `ConcurrentHashMap`, and atomic immutable config objects
 - Monitoring runs only while the app is visible (`STARTED` state — includes PiP and split-screen)
+
+## Publishing a New Version
+
+1. Update `VERSION_NAME` in `gradle.properties`
+2. Merge changes to `lokal-main`
+3. Set your GitHub PAT with `write:packages` scope:
+   ```bash
+   export GITHUB_TOKEN=ghp_your_token_here
+   ```
+4. Run the publish script:
+   ```bash
+   ./lokalPublishToGithubPackages.sh
+   ```
+5. Tag the release:
+   ```bash
+   git tag v<version>
+   git push origin v<version>
+   ```
+6. Update consumers to the new version
 
 ## License
 
