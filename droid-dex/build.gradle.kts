@@ -1,5 +1,4 @@
 import com.vanniktech.maven.publish.AndroidMultiVariantLibrary
-import java.net.URI
 
 plugins {
 	alias(libs.plugins.android.library)
@@ -9,22 +8,10 @@ plugins {
 }
 
 
-publishing {
-	repositories {
-		maven {
-			name = "LokalGitHubPackages"
-			url = URI("https://maven.pkg.github.com/lokal-app/device-telemetry-toolkit")
-			credentials {
-				username = System.getenv("GITHUB_USERNAME") ?: "lokal-app"
-				password = System.getenv("GITHUB_TOKEN") ?: ""
-			}
-		}
-	}
-}
-
-
 mavenPublishing {
 	configure(AndroidMultiVariantLibrary(sourcesJar = true, publishJavadocJar = true))
+	publishToMavenCentral()
+	signAllPublications()
 }
 
 
